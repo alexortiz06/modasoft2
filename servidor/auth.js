@@ -1,5 +1,5 @@
 // servidor/auth.js
-const bcrypt = require('bcrypt');
+const bcrypt = require('bcryptjs');
 
 async function verificarCredenciales(reqUsuario, reqPassword, db) {
   // Consulta simple del usuario en BD

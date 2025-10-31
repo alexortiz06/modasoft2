@@ -23,7 +23,7 @@ async function verificarConexiónBD() {
 
 // Ejemplo: obtener 10 productos (No usado en servidor.js, pero mantenido)
 async function obtenerProductos(limit = 10) {
-  const [rows] = await pool.query('SELECT id_producto, nombre, precio_venta FROM Productos LIMIT ?', [limit]);
+  const [rows] = await pool.query('SELECT id_producto, nombre, precio_venta FROM productos LIMIT ?', [limit]);
   return rows;
 }
 

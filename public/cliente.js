@@ -1,7 +1,7 @@
 document.addEventListener('DOMContentLoaded', () => {
     // --- Mostrar tallas dinámicas en registro de producto ---
     const tallasDinamicasDiv = document.getElementById('tallas-dinamicas');
-    async function mostrarTallasDinamicas() {
+    window.mostrarTallasDinamicas = async function mostrarTallasDinamicas() {
         if (!tallasDinamicasDiv) return;
         try {
             const res = await fetch('/api/tallas');
@@ -19,7 +19,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- ADMINISTRADOR: Gestión de Tallas ---
     const formTalla = document.getElementById('form-talla');
     const catalogoTallas = document.getElementById('catalogoTallas');
-    async function cargarTallas() {
+    window.cargarTallas = async function cargarTallas() {
         try {
             const res = await fetch('/api/tallas');
             const data = await res.json();
@@ -236,7 +236,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const formCategoria = document.getElementById('form-categoria');
     const catalogoCategorias = document.getElementById('catalogoCategorias');
     const prodCategoria = document.getElementById('prodCategoria');
-    async function cargarCategorias() {
+    window.cargarCategorias = async function cargarCategorias() {
         try {
             const res = await fetch('/api/categorias');
             const data = await res.json();
@@ -294,7 +294,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const formProveedor = document.getElementById('form-proveedor');
     const catalogoProveedores = document.getElementById('catalogoProveedores');
     const prodProveedor = document.getElementById('prodProveedor');
-    async function cargarProveedores() {
+    window.cargarProveedores = async function cargarProveedores() {
         try {
             const res = await fetch('/api/proveedores');
             const data = await res.json();

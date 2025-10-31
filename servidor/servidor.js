@@ -1,7 +1,14 @@
 // servidor/servidor.js
 const express = require('express');
 const path = require('path');
-const bcrypt = require('bcrypt');
+let bcrypt;
+try {
+  // prefer native bcrypt if available
+  bcrypt = require('bcrypt');
+} catch (e) {
+  // fallback to bcryptjs (pure JS) which is already installed
+  bcrypt = require('bcryptjs');
+}
 const { pool, verificarConexiónBD, obtenerProductos } = require('./db'); // db.js con MySQL
 const { verificarCredenciales } = require('./auth');
 const cookieSession = require('cookie-session');
@@ -79,12 +86,12 @@ app.delete('/api/categorias/:id', requiereRol('administrador'), async (req, res)
   const id = req.params.id;
   try {
     // Verificar uso en Productos
-    const [cnt] = await pool.query('SELECT COUNT(*) as total FROM Productos WHERE id_categoria = ?', [id]);
+  const [cnt] = await pool.query('SELECT COUNT(*) as total FROM productos WHERE id_categoria = ?', [id]);
     const total = (Array.isArray(cnt) && cnt[0]) ? cnt[0].total : (cnt.total || 0);
     if (total > 0) {
       return res.status(400).json({ success: false, message: `No se puede eliminar: ${total} producto(s) usan esta categoría` });
     }
-    const [delRes] = await pool.query('DELETE FROM Categorias WHERE id_categoria = ?', [id]);
+  const [delRes] = await pool.query('DELETE FROM categorias WHERE id_categoria = ?', [id]);
     if (delRes.affectedRows > 0) return res.json({ success: true });
     return res.status(404).json({ success: false, message: 'Categoría no encontrada' });
   } catch (e) {
@@ -94,7 +101,7 @@ app.delete('/api/categorias/:id', requiereRol('administrador'), async (req, res)
 });
 app.get('/api/categorias', requiereRol('administrador'), async (req, res) => {
   try {
-    const [rows] = await pool.query('SELECT id_categoria, nombre FROM Categorias ORDER BY nombre');
+  const [rows] = await pool.query('SELECT id_categoria, nombre FROM categorias ORDER BY nombre');
     res.json({ categorias: rows });
   } catch (e) {
     res.status(500).json({ categorias: [] });
@@ -118,7 +125,7 @@ app.post('/api/categorias', requiereRol('administrador'), async (req, res) => {
   const { nombre } = req.body;
   if (!nombre) return res.json({ ok: false });
   try {
-    await pool.query('INSERT INTO Categorias (nombre) VALUES (?)', [nombre]);
+  await pool.query('INSERT INTO categorias (nombre) VALUES (?)', [nombre]);
     res.json({ ok: true });
   } catch (e) {
     res.json({ ok: false });
@@ -130,12 +137,12 @@ app.delete('/api/proveedores/:id', requiereRol('administrador'), async (req, res
   const id = req.params.id;
   try {
     // Verificar uso en Productos
-    const [cnt] = await pool.query('SELECT COUNT(*) as total FROM Productos WHERE id_proveedor = ?', [id]);
+  const [cnt] = await pool.query('SELECT COUNT(*) as total FROM productos WHERE id_proveedor = ?', [id]);
     const total = (Array.isArray(cnt) && cnt[0]) ? cnt[0].total : (cnt.total || 0);
     if (total > 0) {
       return res.status(400).json({ success: false, message: `No se puede eliminar: ${total} producto(s) usan este proveedor` });
     }
-    const [delRes] = await pool.query('DELETE FROM Proveedores WHERE id_proveedor = ?', [id]);
+  const [delRes] = await pool.query('DELETE FROM proveedores WHERE id_proveedor = ?', [id]);
     if (delRes.affectedRows > 0) return res.json({ success: true });
     return res.status(404).json({ success: false, message: 'Proveedor no encontrado' });
   } catch (e) {
@@ -146,7 +153,7 @@ app.delete('/api/proveedores/:id', requiereRol('administrador'), async (req, res
 // Tallas
 app.get('/api/tallas', requiereRol('administrador'), async (req, res) => {
   try {
-    const [rows] = await pool.query('SELECT id_talla, nombre FROM Tallas ORDER BY nombre');
+  const [rows] = await pool.query('SELECT id_talla, nombre FROM tallas ORDER BY nombre');
     res.json({ tallas: rows });
   } catch (e) {
     res.status(500).json({ tallas: [] });
@@ -156,7 +163,7 @@ app.post('/api/tallas', requiereRol('administrador'), async (req, res) => {
   const { nombre } = req.body;
   if (!nombre) return res.json({ ok: false });
   try {
-    await pool.query('INSERT INTO Tallas (nombre) VALUES (?)', [nombre]);
+  await pool.query('INSERT INTO tallas (nombre) VALUES (?)', [nombre]);
     res.json({ ok: true });
   } catch (e) {
     res.json({ ok: false });
@@ -168,7 +175,7 @@ app.put('/api/tallas/:id', requiereRol('administrador'), async (req, res) => {
   const { nombre, ajuste, pecho, cintura, cadera, largo } = req.body;
   if (!nombre || !ajuste) return res.status(400).json({ success: false, message: 'Nombre y ajuste requeridos' });
   try {
-    const [result] = await pool.query('UPDATE Tallas SET nombre = ?, ajuste = ?, pecho = ?, cintura = ?, cadera = ?, largo = ? WHERE id_talla = ?', [nombre, ajuste, pecho || null, cintura || null, cadera || null, largo || null, id]);
+  const [result] = await pool.query('UPDATE tallas SET nombre = ?, ajuste = ?, pecho = ?, cintura = ?, cadera = ?, largo = ? WHERE id_talla = ?', [nombre, ajuste, pecho || null, cintura || null, cadera || null, largo || null, id]);
     if (result.affectedRows > 0) return res.json({ success: true });
     return res.status(404).json({ success: false, message: 'Talla no encontrada' });
   } catch (e) {
@@ -179,13 +186,13 @@ app.put('/api/tallas/:id', requiereRol('administrador'), async (req, res) => {
 app.delete('/api/tallas/:id', requiereRol('administrador'), async (req, res) => {
   const id = req.params.id;
   try {
-    // Verificar uso en Inventario
-    const [cnt] = await pool.query('SELECT COUNT(*) as total FROM Inventario WHERE id_talla = ?', [id]);
+  // Verificar uso en inventario
+  const [cnt] = await pool.query('SELECT COUNT(*) as total FROM inventario WHERE id_talla = ?', [id]);
     const total = (Array.isArray(cnt) && cnt[0]) ? cnt[0].total : (cnt.total || 0);
     if (total > 0) {
       return res.status(400).json({ success: false, message: `No se puede eliminar: ${total} registro(s) en inventario usan esta talla` });
     }
-    const [delRes] = await pool.query('DELETE FROM Tallas WHERE id_talla = ?', [id]);
+  const [delRes] = await pool.query('DELETE FROM tallas WHERE id_talla = ?', [id]);
     if (delRes.affectedRows > 0) return res.json({ success: true });
     return res.status(404).json({ success: false, message: 'Talla no encontrada' });
   } catch (e) {
@@ -202,13 +209,13 @@ app.get('/api/:tipo/validar-eliminacion/:id', requiereRol('administrador'), asyn
     let query;
     switch (tipo) {
       case 'categorias':
-        query = 'SELECT COUNT(*) as total FROM Productos WHERE id_categoria = ?';
+        query = 'SELECT COUNT(*) as total FROM productos WHERE id_categoria = ?';
         break;
       case 'tallas':
-        query = 'SELECT COUNT(*) as total FROM Inventario WHERE id_talla = ?';
+        query = 'SELECT COUNT(*) as total FROM inventario WHERE id_talla = ?';
         break;
       case 'proveedores':
-        query = 'SELECT COUNT(*) as total FROM Productos WHERE id_proveedor = ?';
+        query = 'SELECT COUNT(*) as total FROM productos WHERE id_proveedor = ?';
         break;
       default:
         return res.status(400).json({ puedeEliminar: false, message: 'Tipo no válido' });
@@ -226,7 +233,7 @@ app.get('/api/:tipo/validar-eliminacion/:id', requiereRol('administrador'), asyn
 });
 app.get('/api/proveedores', requiereRol('administrador'), async (req, res) => {
   try {
-    const [rows] = await pool.query('SELECT id_proveedor, nombre FROM Proveedores ORDER BY nombre');
+  const [rows] = await pool.query('SELECT id_proveedor, nombre FROM proveedores ORDER BY nombre');
     res.json({ proveedores: rows });
   } catch (e) {
     res.status(500).json({ proveedores: [] });
@@ -238,7 +245,7 @@ app.put('/api/proveedores/:id', requiereRol('administrador'), async (req, res) =
   const { nombre, contacto, telefono } = req.body;
   if (!nombre || nombre.trim() === '') return res.status(400).json({ success: false, message: 'Nombre requerido' });
   try {
-    const [result] = await pool.query('UPDATE Proveedores SET nombre = ?, contacto = ?, telefono = ? WHERE id_proveedor = ?', [nombre.trim(), contacto || null, telefono || null, id]);
+  const [result] = await pool.query('UPDATE proveedores SET nombre = ?, contacto = ?, telefono = ? WHERE id_proveedor = ?', [nombre.trim(), contacto || null, telefono || null, id]);
     if (result.affectedRows > 0) return res.json({ success: true });
     return res.status(404).json({ success: false, message: 'Proveedor no encontrado' });
   } catch (e) {
@@ -250,7 +257,7 @@ app.post('/api/proveedores', requiereRol('administrador'), async (req, res) => {
   const { nombre, contacto, telefono } = req.body;
   if (!nombre) return res.json({ ok: false });
   try {
-    await pool.query('INSERT INTO Proveedores (nombre, contacto, telefono) VALUES (?, ?, ?)', [nombre, contacto, telefono]);
+  await pool.query('INSERT INTO proveedores (nombre, contacto, telefono) VALUES (?, ?, ?)', [nombre, contacto, telefono]);
     res.json({ ok: true });
   } catch (e) {
     res.json({ ok: false });
@@ -262,14 +269,14 @@ app.post('/api/productos', requiereRol('administrador'), async (req, res) => {
   try {
     // 1. Insertar producto principal
     const [prodResult] = await pool.query(
-      'INSERT INTO Productos (nombre, marca, precio_venta, inventario, id_categoria, id_proveedor) VALUES (?, ?, ?, ?, ?, ?)',
+      'INSERT INTO productos (nombre, marca, precio_venta, inventario, id_categoria, id_proveedor) VALUES (?, ?, ?, ?, ?, ?)',
       [nombre, marca, precio, inventario, categoria, proveedor]
     );
     const id_producto = prodResult.insertId;
     // 2. Insertar cantidades por talla en InventarioTallas
     if (Array.isArray(cantidades)) {
       for (const t of cantidades) {
-        await pool.query('INSERT INTO Inventario (id_producto, id_talla, cantidad) VALUES (?, ?, ?)', [id_producto, t.id_talla, t.cantidad]);
+  await pool.query('INSERT INTO inventario (id_producto, id_talla, cantidad) VALUES (?, ?, ?)', [id_producto, t.id_talla, t.cantidad]);
       }
     }
     res.json({ ok: true, id_producto });
@@ -283,7 +290,7 @@ app.post('/api/productos', requiereRol('administrador'), async (req, res) => {
 app.get('/api/admin/productos/:id', requiereRol('administrador'), async (req, res) => {
   const id = req.params.id;
   try {
-    const [rows] = await pool.query('SELECT id_producto, nombre, marca, inventario, precio_venta, id_categoria, id_proveedor FROM Productos WHERE id_producto = ?', [id]);
+  const [rows] = await pool.query('SELECT id_producto, nombre, marca, inventario, precio_venta, id_categoria, id_proveedor FROM productos WHERE id_producto = ?', [id]);
     if (rows.length > 0) {
       res.json({ producto: rows[0] });
     } else {
@@ -298,7 +305,7 @@ app.put('/api/admin/productos/:id', requiereRol('administrador'), async (req, re
   const id = req.params.id;
   const { marca, nombre, inventario, precio, id_categoria, id_proveedor } = req.body;
   try {
-    await pool.query('UPDATE Productos SET marca = ?, nombre = ?, inventario = ?, precio_venta = ?, id_categoria = ?, id_proveedor = ? WHERE id_producto = ?', [marca, nombre, inventario, precio, id_categoria, id_proveedor, id]);
+  await pool.query('UPDATE productos SET marca = ?, nombre = ?, inventario = ?, precio_venta = ?, id_categoria = ?, id_proveedor = ? WHERE id_producto = ?', [marca, nombre, inventario, precio, id_categoria, id_proveedor, id]);
     res.json({ ok: true });
   } catch (e) {
     res.json({ ok: false });
@@ -308,7 +315,7 @@ app.put('/api/admin/productos/:id', requiereRol('administrador'), async (req, re
 app.delete('/api/admin/productos/:id', requiereRol('administrador'), async (req, res) => {
   const id = req.params.id;
   try {
-    await pool.query('DELETE FROM Productos WHERE id_producto = ?', [id]);
+  await pool.query('DELETE FROM productos WHERE id_producto = ?', [id]);
     res.json({ ok: true });
   } catch (e) {
     res.json({ ok: false });
@@ -317,7 +324,7 @@ app.delete('/api/admin/productos/:id', requiereRol('administrador'), async (req,
 app.get('/api/admin/productos', requiereRol('administrador'), async (req, res) => {
   const { q } = req.query;
   try {
-    let query = 'SELECT id_producto, nombre, marca, inventario, precio_venta FROM Productos';
+  let query = 'SELECT id_producto, nombre, marca, inventario, precio_venta FROM productos';
     let params = [];
     if (q) {
       query += ' WHERE nombre LIKE ?';
@@ -329,7 +336,7 @@ app.get('/api/admin/productos', requiereRol('administrador'), async (req, res) =
     // Obtener cantidades por talla para cada producto
     for (const prod of rows) {
       const [tallas] = await pool.query(
-        'SELECT Tallas.nombre AS talla, Inventario.cantidad FROM Inventario JOIN Tallas ON Inventario.id_talla = Tallas.id_talla WHERE Inventario.id_producto = ?',
+        'SELECT tallas.nombre AS talla, inventario.cantidad FROM inventario JOIN tallas ON inventario.id_talla = tallas.id_talla WHERE inventario.id_producto = ?',
         [prod.id_producto]
       );
       prod.tallas = tallas.map(t => `${t.talla}=${t.cantidad}`).join(' ');
@@ -348,7 +355,7 @@ app.post('/api/admin/productos', requiereRol('administrador'), async (req, res) 
   const final_id_categoria = id_categoria || 1; 
   try {
     const [result] = await pool.query(
-      'INSERT INTO Productos (nombre, descripcion, precio_venta, id_categoria) VALUES (?, ?, ?, ?)',
+      'INSERT INTO productos (nombre, descripcion, precio_venta, id_categoria) VALUES (?, ?, ?, ?)',
       [nombre, descripcion || '', precio_venta, final_id_categoria]
     );
     res.json({ ok: true, id_producto: result.insertId });
@@ -364,7 +371,7 @@ app.get('/api/clientes/buscar', requiereRol('caja'), async (req, res) => {
   const cedula = req.query.cedula;
   if (!cedula) return res.json({ cliente: null });
   try {
-    const [rows] = await pool.query('SELECT id_cliente, nombre, cedula, telefono, email FROM Clientes WHERE cedula = ? LIMIT 1', [cedula]);
+  const [rows] = await pool.query('SELECT id_cliente, nombre, cedula, telefono, email FROM clientes WHERE cedula = ? LIMIT 1', [cedula]);
     if (rows.length > 0) {
       res.json({ cliente: rows[0] });
     } else {
@@ -380,28 +387,28 @@ app.post('/api/ventas', requiereRol('caja'), async (req, res) => {
   try {
     // 1. Buscar o crear cliente
     let id_cliente = null;
-    const [cliRows] = await pool.query('SELECT id_cliente FROM Clientes WHERE cedula = ?', [cliente_cedula]);
+  const [cliRows] = await pool.query('SELECT id_cliente FROM clientes WHERE cedula = ?', [cliente_cedula]);
     if (cliRows.length > 0) {
       id_cliente = cliRows[0].id_cliente;
     } else {
-      const [cliRes] = await pool.query('INSERT INTO Clientes (nombre, cedula, telefono, email) VALUES (?, ?, ?, ?)', [cliente_nombre, cliente_cedula, cliente_telefono || '', cliente_email || '']);
+  const [cliRes] = await pool.query('INSERT INTO clientes (nombre, cedula, telefono, email) VALUES (?, ?, ?, ?)', [cliente_nombre, cliente_cedula, cliente_telefono || '', cliente_email || '']);
       id_cliente = cliRes.insertId;
     }
     // 2. Registrar venta principal
     const [ventaRes] = await pool.query(
-      'INSERT INTO Ventas (fecha_hora, total_venta, tipo_pago, id_usuario, id_cliente) VALUES (NOW(), ?, ?, ?, ?)',
+      'INSERT INTO ventas (fecha_hora, total_venta, tipo_pago, id_usuario, id_cliente) VALUES (NOW(), ?, ?, ?, ?)',
       [total_dolar, tipo_pago, req.session.user.id, id_cliente]
     );
     const id_venta = ventaRes.insertId;
     // 3. Registrar detalle de venta
     // Buscar id_producto por marca (simplificado)
-    const [prodRows] = await pool.query('SELECT id_producto FROM Productos WHERE marca = ? LIMIT 1', [marca]);
+  const [prodRows] = await pool.query('SELECT id_producto FROM productos WHERE marca = ? LIMIT 1', [marca]);
     let id_producto = prodRows.length > 0 ? prodRows[0].id_producto : null;
   // Buscar id_talla
-  const [tallaRows] = await pool.query('SELECT id_talla FROM Tallas WHERE nombre = ?', [talla]);
+  const [tallaRows] = await pool.query('SELECT id_talla FROM tallas WHERE nombre = ?', [talla]);
   let id_talla = tallaRows.length > 0 ? tallaRows[0].id_talla : null;
     if (id_producto && id_talla) {
-      await pool.query('INSERT INTO DetalleVenta (id_venta, id_producto, id_talla, cantidad, precio_unitario) VALUES (?, ?, ?, ?, ?)', [id_venta, id_producto, id_talla, cantidad, precio_unitario]);
+  await pool.query('INSERT INTO detalleventa (id_venta, id_producto, id_talla, cantidad, precio_unitario) VALUES (?, ?, ?, ?, ?)', [id_venta, id_producto, id_talla, cantidad, precio_unitario]);
     }
     res.json({ ok: true, id_venta });
   } catch (e) {
