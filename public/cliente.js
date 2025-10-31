@@ -31,7 +31,18 @@ document.addEventListener('DOMContentLoaded', () => {
                     data.tallas.forEach(talla => {
                         const div = document.createElement('div');
                         div.className = 'item';
-                        div.innerHTML = `<b>${talla.nombre}</b> | Ajuste: ${talla.ajuste || ''} | Pecho: ${talla.pecho || '-'} | Cintura: ${talla.cintura || '-'} | Cadera: ${talla.cadera || '-'} | Largo: ${talla.largo || '-'} <button class='btn danger' style='background:#ef4444;color:#fff;margin-left:10px;' onclick='eliminarTalla(${talla.id_talla})'>Eliminar</button>`;
+                        div.dataset.id = talla.id_talla;
+                        div.dataset.ajuste = talla.ajuste || '';
+                        div.dataset.pecho = talla.pecho || '';
+                        div.dataset.cintura = talla.cintura || '';
+                        div.dataset.cadera = talla.cadera || '';
+                        div.dataset.largo = talla.largo || '';
+                        div.innerHTML = `
+                            <span><b>${talla.nombre}</b> | Ajuste: ${talla.ajuste || '-'} | Pecho: ${talla.pecho || '-'} | Cintura: ${talla.cintura || '-'} | Cadera: ${talla.cadera || '-'} | Largo: ${talla.largo || '-'}</span>
+                            <div class="actions">
+                                <button class='btn btn-small' onclick='editarTalla(${talla.id_talla}, ${JSON.stringify(talla)})'>Editar</button>
+                                <button class='btn btn-small secondary' onclick='mostrarConfirmacion(${talla.id_talla}, "tallas", "${talla.nombre}")'>Eliminar</button>
+                            </div>`;
                         catalogoTallas.appendChild(div);
                     });
                 }
@@ -234,7 +245,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 data.categorias.forEach(cat => {
                     const div = document.createElement('div');
                     div.className = 'item';
-                    div.innerHTML = `${cat.nombre} <button class='btn danger' style='background:#ef4444;color:#fff;margin-left:10px;' onclick='eliminarCategoria(${cat.id_categoria})'>Eliminar</button>`;
+                    div.dataset.id = cat.id_categoria;
+                    div.innerHTML = `
+                        <span>${cat.nombre}</span>
+                        <div class="actions">
+                            <button class='btn btn-small' onclick='editarCategoria(${cat.id_categoria}, "${cat.nombre}")'>Editar</button>
+                            <button class='btn btn-small secondary' onclick='mostrarConfirmacion(${cat.id_categoria}, "categorias", "${cat.nombre}")'>Eliminar</button>
+                        </div>`;
                     catalogoCategorias.appendChild(div);
                 });
             }
@@ -286,7 +303,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 data.proveedores.forEach(prov => {
                     const div = document.createElement('div');
                     div.className = 'item';
-                    div.innerHTML = `${prov.nombre} <button class='btn danger' style='background:#ef4444;color:#fff;margin-left:10px;' onclick='eliminarProveedor(${prov.id_proveedor})'>Eliminar</button>`;
+                    div.dataset.id = prov.id_proveedor;
+                    div.dataset.contacto = prov.contacto || '';
+                    div.dataset.telefono = prov.telefono || '';
+                    div.innerHTML = `
+                        <span><b>${prov.nombre}</b>${prov.contacto ? ` | Contacto: ${prov.contacto}` : ''}${prov.telefono ? ` | Tel: ${prov.telefono}` : ''}</span>
+                        <div class="actions">
+                            <button class='btn btn-small' onclick='editarProveedor(${prov.id_proveedor}, ${JSON.stringify({nombre: prov.nombre, contacto: prov.contacto, telefono: prov.telefono})})'>Editar</button>
+                            <button class='btn btn-small secondary' onclick='mostrarConfirmacion(${prov.id_proveedor}, "proveedores", "${prov.nombre}")'>Eliminar</button>
+                        </div>`;
                     catalogoProveedores.appendChild(div);
                 });
             }

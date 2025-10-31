@@ -2,18 +2,20 @@
 /* VARIABLES Y BASE                               */
 /* -------------------------------------------------------------------------- */
 :root {
-    --color-primary: #2563eb;
-    --color-secondary: #f97316;
-    --color-success: #059669;
-    --color-error: #dc2626;
-    --color-bg: #f8fafc;
+    --color-primary: #0ea5e9;    /* Sky 500 */
+    --color-primary-dark: #0284c7; /* Sky 600 */
+    --color-secondary: #f97316;   /* Orange 500 */
+    --color-success: #10b981;    /* Emerald 500 */
+    --color-error: #ef4444;      /* Red 500 */
+    --color-bg: #f8fafc;         /* Slate 50 */
     --color-surface: #ffffff;
-    --color-text: #1e293b;
-    --color-text-light: #64748b;
-    --color-border: #e2e8f0;
-    --border-radius: 8px;
+    --color-text: #0f172a;       /* Slate 900 */
+    --color-text-light: #64748b; /* Slate 500 */
+    --color-border: #e2e8f0;     /* Slate 200 */
+    --border-radius: 0.5rem;     /* 8px */
     --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
     --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+    --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1);
     --transition: all 0.2s ease;
     --padding-base: 1.5rem;
 }
@@ -63,17 +65,27 @@ h3 {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 1rem 0;
-    margin-bottom: 1rem;
-    border-bottom: 3px solid var(--color-primary);
+    padding: 1.5rem 0;
+    margin-bottom: 2rem;
+    background: linear-gradient(to right, var(--color-primary), var(--color-primary-dark));
+    margin: -2rem -2rem 2rem -2rem;
+    padding: 1.5rem 2rem;
+    color: white;
+    box-shadow: var(--shadow-md);
 }
 
 .card {
     background-color: var(--color-surface);
     border-radius: var(--border-radius);
-    box-shadow: var(--shadow-sm);
+    box-shadow: var(--shadow-md);
     padding: var(--padding-base);
+    border: 1px solid var(--color-border);
     transition: var(--transition);
+}
+
+.card:hover {
+    box-shadow: var(--shadow-lg);
+    transform: translateY(-2px);
 }
 
 .card:hover {
@@ -211,36 +223,54 @@ h3 {
 .btn {
     padding: 0.75rem 1.25rem;
     border: none;
-    border-radius: 6px;
+    border-radius: var(--border-radius);
     cursor: pointer;
     font-weight: 600;
-    transition: background-color 0.2s, box-shadow 0.2s;
-    width: 100%;
+    transition: var(--transition);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    font-size: 0.95rem;
+    background: var(--color-surface);
+    color: var(--color-text);
+    border: 1px solid var(--color-border);
+}
+
+.btn:hover {
+    border-color: var(--color-primary);
+    color: var(--color-primary);
+    box-shadow: var(--shadow-sm);
 }
 
 .btn.primary {
-    background-color: var(--color-primary);
+    background: var(--color-primary);
     color: white;
+    border: none;
 }
 
 .btn.primary:hover {
-    background-color: #2563eb; /* Blue 600 */
-    box-shadow: 0 2px 4px rgba(59, 130, 246, 0.4);
+    background: var(--color-primary-dark);
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-md);
 }
 
 .btn.secondary {
-    background-color: #6b7280; /* Gray 500 */
+    background: var(--color-text-light);
     color: white;
+    border: none;
 }
 
 .btn.secondary:hover {
-    background-color: #4b5563; /* Gray 600 */
+    background: var(--color-text);
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-md);
 }
 
 .btn-small {
     padding: 0.5rem 1rem;
     font-size: 0.875rem;
-    width: auto;
+    min-width: 80px;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -270,9 +300,33 @@ h3 {
     border-radius: 3px;
 }
 
+.list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    margin-top: 1rem;
+    max-height: calc(100vh - 300px);
+    overflow-y: auto;
+    padding-right: 0.5rem;
+}
+
+.list::-webkit-scrollbar {
+    width: 6px;
+}
+
+.list::-webkit-scrollbar-track {
+    background: var(--color-bg);
+    border-radius: 3px;
+}
+
+.list::-webkit-scrollbar-thumb {
+    background: var(--color-text-light);
+    border-radius: 3px;
+}
+
 .list .item {
     background-color: var(--color-surface);
-    padding: 1rem;
+    padding: 1.25rem;
     border: 1px solid var(--color-border);
     border-radius: var(--border-radius);
     display: flex;
@@ -285,6 +339,18 @@ h3 {
 .list .item:hover {
     border-color: var(--color-primary);
     box-shadow: var(--shadow-sm);
+    transform: translateX(4px);
+}
+
+.list .item .actions {
+    display: flex;
+    gap: 0.5rem;
+    opacity: 0.8;
+    transition: var(--transition);
+}
+
+.list .item:hover .actions {
+    opacity: 1;
 }
 
 .list .item.error {
