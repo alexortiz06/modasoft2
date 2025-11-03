@@ -2,14 +2,15 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>ERP simple - Caja</title>
-  <link rel="stylesheet" href="style_caja.css">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+	<title>ERP simple - Caja</title>
+	<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+	<link rel="stylesheet" href="caja.css">
 </head>
 <body>
-  <div id="app" class="container">
-    <header class="header">
-      <h1>ERP simple - Módulo de Caja</h1>
+	<div id="app" class="container">
+		<header class="header">
+			<h1>ERP simple - Módulo de Caja</h1>
       <div id="statusDisplay" class="status-msg">Conectado</div>
       
       <div id="userPanel" class="user-panel">
@@ -20,72 +21,149 @@
       </div>
     </header>
 
-    <main id="panelSection" class="card">
-      <h2>Registro de Ventas Rápidas</h2>
-      
-      <div id="cajaPanel" class="panel tabContent">
-        <div class="row header-row">
-          <h4>Nueva Transacción</h4>
-        </div>
-        <div class="row form-row">
-          <form id="form-venta-caja" style="width:100%;">
-            <div class="row form-row">
-              <div class="col">
-                <input id="ventaClienteCedula" placeholder="Cédula" class="input" required style="width:120px;">
-                <input id="ventaClienteNombre" placeholder="Nombre del Cliente" class="input" required style="width:180px; margin-left:8px;">
-                <input id="ventaClienteTelefono" placeholder="Teléfono" class="input" style="width:120px; margin-left:8px;">
-                <input id="ventaClienteEmail" placeholder="Email" class="input" style="width:160px; margin-left:8px;">
-            </div>
-            <div class="row form-row">
-              <div class="col">
-                <select id="ventaProducto" class="input" required>
-                  <option value="">Selecciona producto</option>
-                </select>
-              </div>
-              <div class="col">
-                <select id="ventaTalla" class="input" required>
-                  <option value="">Selecciona talla</option>
-                </select>
-              </div>
-              <div class="col">
-                <input id="ventaCantidad" placeholder="Cantidad" type="number" min="1" class="input" required>
-              </div>
-            </div>
-            <div class="row form-row">
-              <div class="col">
-                <input id="ventaPrecioUnitario" placeholder="Precio unitario ($)" type="number" step="0.01" class="input" required>
-              </div>
-              <div class="col">
-                <input id="ventaTotalDolar" placeholder="Total ($)" type="text" class="input" readonly>
-              </div>
-              <div class="col">
-                <input id="ventaTotalBs" placeholder="Total (Bs)" type="text" class="input" readonly>
-              </div>
-              <div class="col">
-                <button id="btnAgregarProducto" class="btn secondary" type="button">Agregar al carrito</button>
-              </div>
-            </div>
-            <div class="row form-row">
-              <div class="col">
-                <select id="ventaTipoPago" class="input" required>
-                  <option value="Pago Móvil">Pago Móvil</option>
-                  <option value="Efectivo Bolívares">Efectivo Bolívares</option>
-                  <option value="Transferencia">Transferencia</option>
-                  <option value="Dólares en efectivo">Dólares en efectivo</option>
-                  <option value="Punto de venta">Punto de venta</option>
-                </select>
-              </div>
-              <div class="col">
-                <button id="btnPagarVenta" class="btn primary" type="button">Pagar venta</button>
-              </div>
-            </div>
-          </form>
-        <div id="ventaDetalle" class="list">
-           <div class="item">Carrito vacío. Agrega productos para la venta.</div>
-        </div>
-      </div>
-    </main>
-  </div>
-  <script src="cliente.js"></script>
+		<main id="panelSection" class="card">
+			<h2>Registro de Ventas Rápidas</h2>
+      
+      <div id="cajaPanel" class="panel tabContent">
+        <div class="row header-row">
+          <h4>Nueva Transacción</h4>
+        </div>
+        <div id="cajaNotif" style="margin-bottom:10px;"></div>
+        <form id="form-venta-caja" style="width:100%;">
+          <div class="row form-row">
+            <div class="col">
+              <label>Cliente - Cédula</label>
+              <input id="ventaClienteCedula" placeholder="Cédula" class="input" required>
+            </div>
+            <div class="col">
+              <label>Nombre del Cliente</label>
+              <input id="ventaClienteNombre" placeholder="Nombre del Cliente" class="input" required>
+            </div>
+            <div class="col">
+              <label>Teléfono</label>
+              <input id="ventaClienteTelefono" placeholder="Teléfono" class="input" type="tel">
+            </div>
+            <div class="col">
+              <label>Email</label>
+              <input id="ventaClienteEmail" placeholder="Email" class="input" type="email">
+            </div>
+          </div>
+          <div class="row form-row">
+            <div class="col">
+              <label>Producto</label>
+              <select id="ventaProducto" class="input" required>
+                <option value="">Selecciona producto</option>
+              </select>
+            </div>
+            <div class="col">
+              <label>Categoría</label>
+              <select id="ventaCategoria" class="input">
+                <option value="">Selecciona categoría</option>
+              </select>
+            </div>
+            <div class="col">
+              <label>Talla</label>
+              <select id="ventaTalla" class="input" required>
+                <option value="">Selecciona talla</option>
+              </select>
+            </div>
+            <div class="col">
+              <label>Cantidad</label>
+              <input id="ventaCantidad" placeholder="Cantidad" type="number" min="1" class="input" required>
+            </div>
+          </div>
+          <div class="row form-row">
+            <div class="col">
+              <label>Precio unitario ($)</label>
+              <input id="ventaPrecioUnitario" placeholder="Precio unitario" type="number" step="0.01" class="input" required>
+            </div>
+            <div class="col">
+              <label>Precio unitario (Bs)</label>
+              <input id="ventaPrecioUnitarioBs" placeholder="Precio unitario Bs" type="text" class="input" readonly>
+            </div>
+            <div class="col">
+              <label>Total ($)</label>
+              <input id="ventaTotalDolar" placeholder="Total en dólares" type="text" class="input" readonly>
+            </div>
+            <div class="col">
+              <label>Total (Bs)</label>
+              <input id="ventaTotalBs" placeholder="Total en bolívares" type="text" class="input" readonly>
+            </div>
+            <div class="col" style="display:flex;align-items:flex-end;">
+              <button id="btnAgregarProducto" class="btn secondary" type="button">Agregar al carrito</button>
+            </div>
+          </div>
+          <div class="row form-row">
+            <div class="col">
+              <label>Tipo de Pago</label>
+              <select id="ventaTipoPago" class="input" required>
+                <option value="Pago Móvil">Pago Móvil</option>
+                <option value="Efectivo Bolívares">Efectivo Bolívares</option>
+                <option value="Transferencia">Transferencia</option>
+                <option value="Dólares en efectivo">Dólares en efectivo</option>
+                <option value="Punto de venta">Punto de venta</option>
+              </select>
+            </div>
+            <div class="col" style="display:flex;align-items:flex-end;">
+              <button id="btnPagarVenta" class="btn primary" type="button">Pagar venta</button>
+            </div>
+          </div>
+        </form>
+        <div class="row header-row" style="margin-top:var(--spacing-lg); align-items:center;">
+          <h4 style="margin:0;">Carrito de Compra</h4>
+        </div>
+        <div id="ventaDetalle" class="list">
+          <div class="item">Carrito vacío. Agrega productos para la venta.</div>
+        </div>
+      </div>
+
+      <!-- SECCIÓN DE DEVOLUCIONES -->
+      <div class="row header-row" style="margin-top:var(--spacing-xl);">
+        <h4>Módulo de Devoluciones</h4>
+      </div>
+      <div class="card" style="margin-top:var(--spacing-lg);">
+        <form id="form-acceso-devoluciones">
+          <div class="row form-row">
+            <div class="col">
+              <label>Clave de Acceso</label>
+              <input type="password" id="claveDevoluciones" class="input" placeholder="Ingrese la clave de acceso" required>
+            </div>
+            <div class="col" style="display:flex;align-items:flex-end;">
+              <button type="submit" class="btn primary">Acceder a Devoluciones</button>
+            </div>
+          </div>
+        </form>
+
+        <div id="panelDevoluciones" style="display:none;margin-top:var(--spacing-lg);">
+          <div class="row header-row">
+            <h4>Buscar Venta para Devolución</h4>
+          </div>
+          <div class="row form-row">
+            <div class="col">
+              <label>Cédula del Cliente</label>
+              <input type="text" id="devolucionCedula" class="input" placeholder="Ingrese la cédula del cliente" required>
+            </div>
+            <div class="col" style="display:flex;align-items:flex-end;">
+              <button type="button" id="btnBuscarVentaDevolucion" class="btn secondary">Buscar Ventas</button>
+            </div>
+          </div>
+          <div id="ventasClienteDevolucion" class="list" style="margin-top:var(--spacing-md);">
+            <div class="item">Ingrese la cédula del cliente para buscar sus ventas</div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+  <script src="cliente.js"></script>
+  <script src="devoluciones.js"></script>
+  <script src="caja-funcionalidades.js"></script>
+  <!-- Modal para detalles de promoción -->
+  <div id="promoModal" class="promo-modal" style="display:none;">
+    <div class="promo-modal-content">
+      <button id="promoModalClose" class="btn" style="float:right;">Cerrar</button>
+      <h3 id="promoModalTitle">Detalle de promoción</h3>
+      <div id="promoModalBody"></div>
+    </div>
+  </div>
 </body>
 </html>
