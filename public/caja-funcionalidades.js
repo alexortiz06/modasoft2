@@ -3,8 +3,10 @@ let cajaCart = [];
 let productosCache = [];
 let promocionesCache = [];
 let categoriasCache = [];
-let cachedTasa = null;
-let cachedTasaTs = 0;
+// Estado mínimo de la tasa: solo date y price (number)
+let tasaState = { date: null, price: null };
+// timestamp de última petición (para cache local, no forma parte del estado público)
+let tasaLastFetchTs = 0;
 
 document.addEventListener('DOMContentLoaded', async () => {
   if (document.getElementById('ventaProducto')) {
@@ -22,7 +24,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       await loadCategorias();
       console.log('Categorías cargadas:', categoriasCache.length);
       // Cargar tasa de conversión para mostrar precios en Bs
-      try { await getTasa(); console.log('Tasa cargada:', cachedTasa); } catch(e){ console.warn('No se pudo obtener tasa:', e); }
+    try { await getTasa(); console.log('Tasa cargada:', tasaState.price, 'fecha:', tasaState.date); } catch(e){ console.warn('No se pudo obtener tasa:', e); }
     } catch (e) {
       console.error('Error inicializando:', e);
       // intentar cargar individualmente si Promise.all falló
@@ -74,17 +76,48 @@ async function loadProductosForCaja() {
   }
 }
 
+// Aplica la respuesta de la API a tasaState sin sobreescribir otras propiedades.
+function applyTasaApiResponse(json) {
+  try {
+    if (!json || typeof json !== 'object') return;
+    // Si la API sigue el formato que remitiste: { current: { usd: number, date: string }, ... }
+    if (json.current && typeof json.current === 'object') {
+      if (typeof json.current.usd !== 'undefined') {
+        const p = Number(json.current.usd);
+        if (!Number.isNaN(p)) tasaState.price = p;
+      }
+      if (typeof json.current.date !== 'undefined') {
+        tasaState.date = String(json.current.date);
+      }
+      return;
+    }
+    // Compatibilidad con respuestas anteriores: { tasa: number } o { valor: number }
+    if (typeof json.tasa !== 'undefined' || typeof json.valor !== 'undefined') {
+      const p = Number(json.tasa || json.valor);
+      if (!Number.isNaN(p)) {
+        tasaState.price = p;
+        // no tocar fecha si no viene en la respuesta
+      }
+    }
+  } catch (e) { console.warn('applyTasaApiResponse error', e); }
+}
+
 async function getTasa() {
   const now = Date.now();
-  if (cachedTasa && (now - cachedTasaTs) < (1000*60*5)) return cachedTasa;
+  if (tasaState.price && (now - tasaLastFetchTs) < (1000*60*5)) return tasaState.price;
   try {
     const res = await fetch('/api/tasa-bcv');
     const j = await res.json();
-    const t = Number(j.tasa || j.valor || 0) || 0;
-    if (t > 0) { cachedTasa = t; cachedTasaTs = Date.now(); return cachedTasa; }
+    applyTasaApiResponse(j);
+    tasaLastFetchTs = Date.now();
+    if (tasaState.price) return tasaState.price;
   } catch (e) { console.warn('getTasa error', e); }
-  // fallback
-  cachedTasa = 36; cachedTasaTs = Date.now(); return cachedTasa;
+  // fallback: si ya teníamos una price válida, devolverla; si no, usar 36
+  if (tasaState.price) return tasaState.price;
+  tasaState.price = 36;
+  tasaState.date = tasaState.date || new Date().toISOString().slice(0,10);
+  tasaLastFetchTs = Date.now();
+  return tasaState.price;
 }
 
 async function buscarClientePorCedula(cedula) {
@@ -234,7 +267,7 @@ function calcularTotalesForm() {
   const cantidad = parseInt(document.getElementById('ventaCantidad').value || 0) || 0;
   const total_bs = precio_bs * cantidad;
   // calcular USD con tasa
-  const tasa = Number(cachedTasa || 0);
+  const tasa = Number(tasaState.price || 0);
   const precio_usd = tasa > 0 ? (precio_bs / tasa) : 0;
   const total_usd = precio_usd * cantidad;
   document.getElementById('ventaTotalDolar').value = total_usd ? `$${total_usd.toFixed(2)}` : '';
@@ -247,7 +280,7 @@ async function onAgregarAlCarrito() {
   const cantidad = parseInt(document.getElementById('ventaCantidad').value || 0);
   // Tomamos el precio unitario en Bs desde el formulario y convertimos a USD
   const precio_unitario_bs = parseFloat(document.getElementById('ventaPrecioUnitarioBs').value || 0) || 0;
-  const tasa = await getTasa().catch(()=>cachedTasa || 0);
+  const tasa = await getTasa().catch(()=>tasaState.price || 0);
   const precio_unitario = (tasa && tasa > 0) ? (precio_unitario_bs / tasa) : 0; // en USD
   const id_categoria_seleccionada = document.getElementById('ventaCategoria').value || null;
   if (!id_producto || !cantidad || cantidad <= 0) { alert('Selecciona producto y cantidad válida'); return; }
@@ -540,7 +573,7 @@ function renderCart() {
     console.log(`\n--- Evaluando item ${idx} ---`);
     const calc = aplicarMejorPromocion(it);
   const descuento = Number(calc.descuento || 0); // en USD
-  const tasa = Number(cachedTasa || 0);
+  const tasa = Number(tasaState.price || 0);
   const descuento_bs = descuento * (tasa || 0);
   const subtotal_usd = (it.precio_unitario * it.cantidad) || 0;
   const subtotal_bs = (it.precio_unitario_bs * it.cantidad) || 0;
@@ -687,6 +720,10 @@ if (typeof window !== 'undefined') window._caja = {
   cajaCart,
   renderCart,
   aplicarMejorPromocion,
+  // utilidades para pruebas y debugging: exponer el estado mínimo de la tasa y el aplicador
+  getTasaState: () => ({ ...tasaState }),
+  applyTasaApiResponse,
+  getTasa: getTasa,
   toggleNoPromo: (idx, checked) => { if (cajaCart[idx]) { cajaCart[idx].no_aplicar_promocion = !!checked; renderCart(); } },
   setForcedPromo: (idx, promoId) => { if (cajaCart[idx]) { cajaCart[idx].force_promotion_id = promoId ? Number(promoId) : null; renderCart(); } },
   showPromoDetails: (idx) => {
