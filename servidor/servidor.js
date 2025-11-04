@@ -463,6 +463,9 @@ let _cachedTasaTs = 0;
 const TASA_CACHE_MS = 1000 * 60 * 5; // 5 minutos
 const fetch = require('node-fetch');
 
+// URL por defecto para consultar la tasa si no se provee la variable de entorno
+const BCV_API_URL = process.env.BCV_API_URL || 'https://api.dolarvzla.com/public/exchange-rate';
+
 app.get('/api/tasa-bcv', async (req, res) => {
   const now = Date.now();
   if (_cachedTasa && (now - _cachedTasaTs) < TASA_CACHE_MS) {
@@ -470,12 +473,25 @@ app.get('/api/tasa-bcv', async (req, res) => {
   }
   try {
     // Intentar obtener desde URL configurada (ej: BCV real si la proporcionas)
-    if (process.env.BCV_API_URL) {
-      const resp = await fetch(process.env.BCV_API_URL, { timeout: 5000 });
+    if (BCV_API_URL) {
+      const resp = await fetch(BCV_API_URL, { timeout: 5000 });
       const json = await resp.json();
-      // Se asume que la respuesta tiene un campo 'tasa' o 'valor' según la API real.
-      const tasaFromApi = json.tasa || json.valor || json.USD || (json.data && json.data.USD);
-      const tasa = parseFloat(tasaFromApi);
+      // Soporte para varios formatos: si la API devuelve { current: { usd, date } } usamos current.usd
+      let tasaFromApi;
+      if (json && json.current && typeof json.current === 'object' && typeof json.current.usd !== 'undefined') {
+        tasaFromApi = json.current.usd;
+        // opcional: exponer fecha en la respuesta si viene
+        const fecha = json.current.date || json.current.fecha || null;
+        const parsed = parseFloat(tasaFromApi);
+        if (!isNaN(parsed) && parsed > 0) {
+          _cachedTasa = parsed;
+          _cachedTasaTs = Date.now();
+          return res.json({ tasa: _cachedTasa, source: 'BCV_API_URL', fecha: fecha || null });
+        }
+      }
+      // Se asume también que la respuesta puede tener 'tasa' o 'valor' o estructuras antiguas
+      const fallbackTasa = json.tasa || json.valor || json.USD || (json.data && json.data.USD);
+      const tasa = parseFloat(fallbackTasa);
       if (!isNaN(tasa) && tasa > 0) {
         _cachedTasa = tasa;
         _cachedTasaTs = Date.now();
