@@ -879,18 +879,30 @@ async function renderReporteInventario() {
             cont.innerHTML = '<div class="item">No hay datos de inventario.</div>';
             return;
         }
-        cont.innerHTML = data.rows.map(r => {
+        // Construir tabla
+        let html = `<table style="width:100%;border-collapse:collapse;">
+            <thead>
+              <tr style="background:var(--surface-alt);">
+                <th style="padding:8px;text-align:left;border:1px solid #eee;">Marca</th>
+                <th style="padding:8px;text-align:left;border:1px solid #eee;">Producto</th>
+                <th style="padding:8px;text-align:left;border:1px solid #eee;">Categoría</th>
+                <th style="padding:8px;text-align:right;border:1px solid #eee;">Stock Total</th>
+                <th style="padding:8px;text-align:left;border:1px solid #eee;">Tallas (cantidad)</th>
+              </tr>
+            </thead>
+            <tbody>`;
+        data.rows.forEach(r => {
             const tallas = (r.tallas||[]).map(t => `${t.talla||'-'}: ${t.cantidad}`).join(' · ');
-            return `
-            <div class="item">
-                <div>
-                    <strong>${r.marca || ''} ${r.nombre}</strong><br>
-                    Categoría: ${r.categoria || 'N/A'}<br>
-                    <span style="color:#2e7d32;font-weight:600;">Stock total: ${r.stock_total}</span>
-                    ${tallas ? `<div style="margin-top:6px;color:#666;">${tallas}</div>` : ''}
-                </div>
-            </div>`;
-        }).join('');
+            html += `<tr>
+                <td style="padding:8px;border:1px solid #f4f4f4;">${r.marca || ''}</td>
+                <td style="padding:8px;border:1px solid #f4f4f4;">${r.nombre}</td>
+                <td style="padding:8px;border:1px solid #f4f4f4;">${r.categoria || 'N/A'}</td>
+                <td style="padding:8px;text-align:right;border:1px solid #f4f4f4;">${r.stock_total}</td>
+                <td style="padding:8px;border:1px solid #f4f4f4;">${tallas}</td>
+            </tr>`;
+        });
+        html += `</tbody></table>`;
+        cont.innerHTML = html;
     } catch (e) {
         cont.innerHTML = '<div class="item">Error al cargar inventario.</div>';
     }
@@ -912,22 +924,37 @@ async function renderReporteCompras() {
             cont.innerHTML = '<div class="item">No hay compras en el periodo seleccionado.</div>';
             return;
         }
-        cont.innerHTML = data.grupos.map(g => {
-            const body = g.compras.map(c => `
-                <div style="margin-left:20px;font-size:0.92em;color:#555;">
-                  - #${c.id_compra} ${c.fecha_compra} | ${c.marca||''} ${c.producto||('Producto #' + (c.id_producto||''))}
-                  — ${c.cantidad} x $${Number(c.costo_unitario||0).toFixed(2)} = $${Number(c.total_linea||0).toFixed(2)}
-                </div>
-            `).join('');
-            return `
-            <div class="item">
-              <div>
-                <strong>${g.proveedor}</strong>
-                <div style="margin-top:8px;">${body}</div>
-                <div style="margin-top:8px;font-weight:700;">Subtotal proveedor: $${Number(g.subtotal||0).toFixed(2)}</div>
-              </div>
-            </div>`;
-        }).join('') + `<div class="item" style="border-top:1px solid #ddd;margin-top:10px;padding-top:10px;font-weight:700;">Total general: $${Number(data.total_general||0).toFixed(2)}</div>`;
+        // Construir tabla plana con filas por compra
+        let html = `<table style="width:100%;border-collapse:collapse;">
+            <thead>
+              <tr style="background:var(--surface-alt);">
+                <th style="padding:8px;text-align:left;border:1px solid #eee;">Proveedor</th>
+                <th style="padding:8px;text-align:left;border:1px solid #eee;">ID Compra</th>
+                <th style="padding:8px;text-align:left;border:1px solid #eee;">Fecha</th>
+                <th style="padding:8px;text-align:left;border:1px solid #eee;">Producto</th>
+                <th style="padding:8px;text-align:right;border:1px solid #eee;">Cantidad</th>
+                <th style="padding:8px;text-align:right;border:1px solid #eee;">Costo Unit.</th>
+                <th style="padding:8px;text-align:right;border:1px solid #eee;">Total Línea</th>
+              </tr>
+            </thead>
+            <tbody>`;
+        data.grupos.forEach(g => {
+            (g.compras||[]).forEach(c => {
+                html += `<tr>
+                    <td style="padding:8px;border:1px solid #f4f4f4;">${g.proveedor}</td>
+                    <td style="padding:8px;border:1px solid #f4f4f4;">${c.id_compra}</td>
+                    <td style="padding:8px;border:1px solid #f4f4f4;">${c.fecha_compra}</td>
+                    <td style="padding:8px;border:1px solid #f4f4f4;">${(c.marca||'') + ' ' + (c.producto||('Producto #' + (c.id_producto||'')))}</td>
+                    <td style="padding:8px;text-align:right;border:1px solid #f4f4f4;">${Number(c.cantidad||0)}</td>
+                    <td style="padding:8px;text-align:right;border:1px solid #f4f4f4;">$${Number(c.costo_unitario||0).toFixed(2)}</td>
+                    <td style="padding:8px;text-align:right;border:1px solid #f4f4f4;">$${Number(c.total_linea||0).toFixed(2)}</td>
+                </tr>`;
+            });
+        });
+        html += `</tbody></table>`;
+        // Total general
+        html += `<div style="margin-top:12px;font-weight:700;">Total general: $${Number(data.total_general||0).toFixed(2)}</div>`;
+        cont.innerHTML = html;
     } catch (e) {
         cont.innerHTML = '<div class="item">Error al cargar compras.</div>';
     }

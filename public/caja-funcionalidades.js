@@ -46,6 +46,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     // Render inicial del carrito (si hay items previos)
     renderCart();
+      // Listeners para recalcular totales cuando cambia cantidad o precio en Bs
+      const cantidadEl = document.getElementById('ventaCantidad');
+      const precioBsEl = document.getElementById('ventaPrecioUnitarioBs');
+      if (cantidadEl) cantidadEl.addEventListener('input', calcularTotalesForm);
+      if (precioBsEl) precioBsEl.addEventListener('input', calcularTotalesForm);
     console.log('=== CAJA INICIADA ===');
   }
 });

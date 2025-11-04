@@ -782,8 +782,16 @@ app.get('/api/dashboard/indicadores', requiereRol('administrador'), async (req, 
     const [stock] = await pool.query('SELECT IFNULL(SUM(inventario),0) AS stock_total FROM productos');
     const stockTotal = stock && stock[0] ? Number(stock[0].stock_total) : 0;
     const rotacionInventario = stockTotal > 0 ? unidadesVendidas / stockTotal : 0;
-
-    res.json({ ventasMes, ventasTemporada: porDia, ventasCambio, rotacionInventario, margenGanancia: 0, stockBajo: 0 });
+    // Calcular productos con stock bajo (umbral configurable)
+    const LOW_STOCK_THRESHOLD = Number(process.env.LOW_STOCK_THRESHOLD) || 5;
+    try {
+      const [low] = await pool.query('SELECT COUNT(*) AS bajo FROM productos WHERE inventario <= ?', [LOW_STOCK_THRESHOLD]);
+      const stockBajo = (low && low[0]) ? Number(low[0].bajo) : 0;
+      res.json({ ventasMes, ventasTemporada: porDia, ventasCambio, rotacionInventario, margenGanancia: 0, stockBajo });
+    } catch (e) {
+      console.warn('No se pudo calcular stockBajo:', e.message || e);
+      res.json({ ventasMes, ventasTemporada: porDia, ventasCambio, rotacionInventario, margenGanancia: 0, stockBajo: 0 });
+    }
   } catch (e) {
     console.error('Error indicadores dashboard:', e.message || e);
     res.status(500).json({ error: 'Error al calcular indicadores' });
