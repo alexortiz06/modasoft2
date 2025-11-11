@@ -2005,11 +2005,16 @@ app.get('/api/reportes/ventas-temporada', requiereRol('administrador'), async (r
 
     // Intentar usar la vista si existe, sino calcular manualmente
     try {
-  let query = `SELECT anio, mes, trimestre, periodo, ingreso_total, unidades_vendidas 
-       FROM vista_ventas_temporada 
-       WHERE fecha_hora >= ? AND fecha_hora < ?
-       ORDER BY anio DESC, mes DESC LIMIT 48`;
-      const [rows] = await pool.query(query, [startStr, endStr]);
+      // Algunas vistas no exponen la columna fecha_hora; la vista_ventas_temporada
+      // sí ofrece campos como anio, mes y periodo (ej. '2025-11').
+      // Filtramos por el campo `periodo` para evitar errores de columna desconocida.
+      const startPeriod = startStr.slice(0,7); // 'YYYY-MM'
+      const endPeriod = endStr.slice(0,7);
+      let query = `SELECT anio, mes, trimestre, periodo, ingreso_total, unidades_vendidas 
+                   FROM vista_ventas_temporada 
+                   WHERE periodo >= ? AND periodo < ?
+                   ORDER BY anio DESC, mes DESC LIMIT 48`;
+      const [rows] = await pool.query(query, [startPeriod, endPeriod]);
 
       if (rows.length > 0) {
         // Si se pidió trimestre, agrupar
