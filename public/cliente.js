@@ -616,19 +616,11 @@ document.addEventListener('DOMContentLoaded', () => {
             const proveedor = document.getElementById('prodProveedor').value;
             const nombre = document.getElementById('prodNombre').value.trim();
             const precio = parseFloat(document.getElementById('prodPrecio').value);
-            const inventario = parseInt(document.getElementById('prodInventario').value);
-            // Obtener cantidades por talla
+            // No se requiere inventario ni tallas en gestión de productos
+            const inventario = 0;
             const cantidades = [];
-            if (tallasDinamicasDiv) {
-                const inputs = tallasDinamicasDiv.querySelectorAll('input[type="number"]');
-                inputs.forEach(input => {
-                    const id_talla = input.getAttribute('data-id-talla');
-                    const cantidad = parseInt(input.value) || 0;
-                    cantidades.push({ id_talla, cantidad });
-                });
-            }
             // Validación básica
-            if (!marca || !categoria || !proveedor || !nombre || isNaN(precio) || isNaN(inventario)) {
+            if (!marca || !categoria || !proveedor || !nombre || isNaN(precio)) {
                 alert('Completa todos los campos obligatorios.');
                 return;
             }
@@ -647,7 +639,6 @@ document.addEventListener('DOMContentLoaded', () => {
                         alert(`✅ Producto nuevo registrado correctamente.\n\nID del producto: ${data.id_producto}`);
                     }
                     formProductoAdmin.reset();
-                    mostrarTallasDinamicas();
                     // Recargar lista de productos si existe
                     if (typeof cargarProductos === 'function') {
                         cargarProductos();

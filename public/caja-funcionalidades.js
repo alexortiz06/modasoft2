@@ -36,6 +36,32 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Listeners
     document.getElementById('btnAgregarProducto').addEventListener('click', onAgregarAlCarrito);
     document.getElementById('btnPagarVenta').addEventListener('click', onPagarVenta);
+    
+    // Listener para tasa manual cuando no hay internet
+    const btnAplicarTasaManual = document.getElementById('btnAplicarTasaManual');
+    const tasaManualInput = document.getElementById('tasaManual');
+    if (btnAplicarTasaManual && tasaManualInput) {
+      btnAplicarTasaManual.addEventListener('click', function() {
+        const tasaManual = parseFloat(tasaManualInput.value);
+        if (!isNaN(tasaManual) && tasaManual > 0) {
+          tasaState.price = tasaManual;
+          tasaState.date = new Date().toISOString().slice(0,10);
+          tasaLastFetchTs = Date.now();
+          calcularTotalesForm();
+          const tasaManualContainer = document.getElementById('tasaManualContainer');
+          if (tasaManualContainer) tasaManualContainer.style.display = 'none';
+          alert(`Tasa aplicada: ${tasaManual} Bs/$`);
+        } else {
+          alert('Ingrese un valor válido para la tasa');
+        }
+      });
+      // También permitir aplicar con Enter
+      tasaManualInput.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+          btnAplicarTasaManual.click();
+        }
+      });
+    }
     // Búsqueda automática de cliente por cédula (debounce)
     const cedInput = document.getElementById('ventaClienteCedula');
     if (cedInput) {
@@ -104,14 +130,29 @@ function applyTasaApiResponse(json) {
 
 async function getTasa() {
   const now = Date.now();
-  if (tasaState.price && (now - tasaLastFetchTs) < (1000*60*5)) return tasaState.price;
+  if (tasaState.price && (now - tasaLastFetchTs) < (1000*60*5)) {
+    // Ocultar contenedor manual si tenemos tasa válida
+    const tasaManualContainer = document.getElementById('tasaManualContainer');
+    if (tasaManualContainer) tasaManualContainer.style.display = 'none';
+    return tasaState.price;
+  }
   try {
     const res = await fetch('/api/tasa-bcv');
     const j = await res.json();
     applyTasaApiResponse(j);
     tasaLastFetchTs = Date.now();
-    if (tasaState.price) return tasaState.price;
-  } catch (e) { console.warn('getTasa error', e); }
+    if (tasaState.price) {
+      // Ocultar contenedor manual si obtuvimos tasa exitosamente
+      const tasaManualContainer = document.getElementById('tasaManualContainer');
+      if (tasaManualContainer) tasaManualContainer.style.display = 'none';
+      return tasaState.price;
+    }
+  } catch (e) { 
+    console.warn('getTasa error - sin conexión:', e);
+    // Mostrar contenedor manual cuando no hay conexión
+    const tasaManualContainer = document.getElementById('tasaManualContainer');
+    if (tasaManualContainer) tasaManualContainer.style.display = 'block';
+  }
   // fallback: si ya teníamos una price válida, devolverla; si no, usar 36
   if (tasaState.price) return tasaState.price;
   tasaState.price = 36;

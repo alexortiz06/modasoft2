@@ -538,7 +538,104 @@ app.post('/api/devoluciones/validar-clave', requiereRol('caja'), async (req, res
   }
 });
 
-// Listar ventas de un cliente por cédula, con detalles y cantidades disponibles para devolución
+// Listar ventas por número de venta, con detalles y cantidades disponibles para devolución (validación 48 horas)
+app.get('/api/devoluciones/venta', requiereRol('caja'), async (req, res) => {
+  try {
+    const id_venta = req.query.id_venta ? Number(req.query.id_venta) : null;
+    console.log(`[DEVOLUCIONES] Buscando venta #${id_venta}`);
+    
+    if (!id_venta || isNaN(id_venta)) {
+      console.log('[DEVOLUCIONES] Número de venta inválido');
+      return res.json({ ok: false, ventas: [], error: 'Número de venta inválido' });
+    }
+
+    // Obtener la venta
+    const [ventasRows] = await pool.query(
+      `SELECT id_venta, fecha_hora, total_venta, tipo_pago, id_cliente FROM ventas WHERE id_venta = ? LIMIT 1`,
+      [id_venta]
+    );
+    
+    if (!ventasRows || ventasRows.length === 0) {
+      console.log(`[DEVOLUCIONES] Venta #${id_venta} no encontrada`);
+      return res.json({ ok: true, ventas: [], error: 'Venta no encontrada' });
+    }
+    
+    const venta = ventasRows[0];
+    console.log(`[DEVOLUCIONES] Venta encontrada: #${venta.id_venta}, fecha: ${venta.fecha_hora}`);
+    
+    // Validar que la venta no tenga más de 48 horas
+    const fechaVenta = new Date(venta.fecha_hora);
+    const ahora = new Date();
+    const horasTranscurridas = (ahora - fechaVenta) / (1000 * 60 * 60);
+    console.log(`[DEVOLUCIONES] Horas transcurridas: ${horasTranscurridas.toFixed(2)}`);
+    
+    if (horasTranscurridas > 48) {
+      console.log(`[DEVOLUCIONES] Venta #${id_venta} expirada (más de 48 horas)`);
+      return res.json({ 
+        ok: false, 
+        ventas: [], 
+        error: `La venta #${id_venta} tiene más de 48 horas. No se puede procesar la devolución. Fecha de venta: ${fechaVenta.toLocaleString()}` 
+      });
+    }
+    
+    const ventas = [venta];
+
+    // Para cada venta, obtener detalle + cantidad devuelta acumulada
+    for (const v of ventas) {
+      const [det] = await pool.query(
+        `SELECT d.id_detalle, d.id_producto, d.id_talla, d.cantidad, d.precio_unitario,
+                COALESCE(t.nombre, '-') AS nombre_talla,
+                COALESCE(p.nombre, '') AS nombre_producto,
+                COALESCE(SUM(dev.cantidad), 0) AS devuelta
+         FROM detalleventa d
+         LEFT JOIN productos p ON p.id_producto = d.id_producto
+         LEFT JOIN tallas t ON t.id_talla = d.id_talla
+         LEFT JOIN devoluciones dev ON dev.id_detalle = d.id_detalle
+         WHERE d.id_venta = ?
+         GROUP BY d.id_detalle, d.id_producto, d.id_talla, d.cantidad, d.precio_unitario, t.nombre, p.nombre
+         ORDER BY d.id_detalle`,
+        [v.id_venta]
+      );
+      // Calcular cantidad disponible para devolución y precio neto
+      const [cols] = await pool.query("SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'detalleventa'");
+      const hasDescUnit = Array.isArray(cols) && cols.some(c => c.COLUMN_NAME === 'descuento_unitario');
+      const detConDispon = [];
+      for (const d of det) {
+        const disponible = Math.max(0, Number(d.cantidad || 0) - Number(d.devuelta || 0));
+        let precio_neto = Number(d.precio_unitario || 0);
+        if (hasDescUnit) {
+          try {
+            const [rr] = await pool.query('SELECT descuento_unitario FROM detalleventa WHERE id_detalle = ? LIMIT 1', [d.id_detalle]);
+            if (rr && rr[0] && rr[0].descuento_unitario != null) precio_neto = Math.max(0, precio_neto - Number(rr[0].descuento_unitario || 0));
+          } catch (_) {}
+        }
+        detConDispon.push({
+          id_detalle: d.id_detalle,
+          id_producto: d.id_producto,
+          id_talla: d.id_talla,
+          nombre_producto: d.nombre_producto,
+          nombre_talla: d.nombre_talla,
+          cantidad: Number(d.cantidad),
+          devuelta: Number(d.devuelta),
+          disponible,
+          precio_unitario: Number(d.precio_unitario),
+          precio_neto
+        });
+      }
+      v.detalles = detConDispon;
+      console.log(`[DEVOLUCIONES] Venta #${v.id_venta} tiene ${detConDispon.length} detalles`);
+    }
+
+    console.log(`[DEVOLUCIONES] Retornando ${ventas.length} venta(s)`);
+    return res.json({ ok: true, ventas });
+  } catch (e) {
+    console.error('[DEVOLUCIONES] Error /api/devoluciones/venta:', e.message || e);
+    console.error('[DEVOLUCIONES] Stack:', e.stack);
+    return res.status(500).json({ ok: false, ventas: [], error: 'Error del servidor: ' + (e.message || 'Error desconocido') });
+  }
+});
+
+// Mantener endpoint anterior por compatibilidad (deprecated)
 app.get('/api/devoluciones/ventas-cliente', requiereRol('caja'), async (req, res) => {
   try {
     const cedula = req.query.cedula ? String(req.query.cedula).trim() : '';
@@ -1656,6 +1753,53 @@ app.get('/api/admin/clientes/resumen', requiereRol('administrador'), async (req,
   }
 });
 
+// Endpoint administrativo: listar todos los clientes
+app.get('/api/admin/clientes', requiereRol('administrador'), async (req, res) => {
+  try {
+    const busqueda = req.query.busqueda ? String(req.query.busqueda).trim() : null;
+    
+    let query = `SELECT 
+      c.id_cliente,
+      c.nombre,
+      c.cedula,
+      c.telefono,
+      c.email,
+      COUNT(DISTINCT v.id_venta) AS total_ventas,
+      COALESCE(SUM(v.total_venta), 0) AS total_compras
+    FROM clientes c
+    LEFT JOIN ventas v ON c.id_cliente = v.id_cliente
+    WHERE 1=1`;
+    
+    const params = [];
+    if (busqueda) {
+      query += ` AND (c.nombre LIKE ? OR c.cedula LIKE ? OR c.email LIKE ?)`;
+      const busquedaPattern = `%${busqueda}%`;
+      params.push(busquedaPattern, busquedaPattern, busquedaPattern);
+    }
+    
+    query += ` GROUP BY c.id_cliente, c.nombre, c.cedula, c.telefono, c.email
+               ORDER BY c.nombre ASC
+               LIMIT 500`;
+    
+    const [clientes] = await pool.query(query, params);
+    
+    const clientesData = clientes.map(c => ({
+      id_cliente: c.id_cliente,
+      nombre: c.nombre || 'Sin nombre',
+      cedula: c.cedula || 'N/A',
+      telefono: c.telefono || 'N/A',
+      email: c.email || 'N/A',
+      total_ventas: Number(c.total_ventas || 0),
+      total_compras: Number(c.total_compras || 0)
+    }));
+    
+    res.json({ ok: true, clientes: clientesData });
+  } catch (e) {
+    console.error('Error listar clientes admin:', e.message || e);
+    res.status(500).json({ ok: false, clientes: [], error: 'Error del servidor' });
+  }
+});
+
 // Endpoint administrativo: obtener ventas (historial) completas de un cliente por cédula
 app.get('/api/admin/clientes/ventas', requiereRol('administrador'), async (req, res) => {
   try {
@@ -1828,23 +1972,89 @@ app.listen(PORT, () => {
 app.get('/api/reportes/ventas-temporada', requiereRol('administrador'), async (req, res) => {
   try {
     // periodo puede ser: actual, anterior, trimestre, anual, todos
-    const periodo = req.query.periodo || 'todos';
-    const year = req.query.year ? Number(req.query.year) : null;
-
-    // Si la vista existe, retornamos filas filtradas por año si se solicita
-    let query = 'SELECT anio, mes, trimestre, periodo, ingreso_total, unidades_vendidas FROM vista_ventas_temporada';
-    const params = [];
-    if (year) {
-      query += ' WHERE anio = ?';
-      params.push(year);
+    const periodo = req.query.periodo || 'actual';
+    const now = new Date();
+    let start, end;
+    
+    // Calcular rango de fechas según periodo
+    switch(periodo) {
+      case 'actual':
+        start = new Date(now.getFullYear(), now.getMonth(), 1);
+        end = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+        break;
+      case 'anterior':
+        start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        end = new Date(now.getFullYear(), now.getMonth(), 1);
+        break;
+      case 'trimestre':
+        const trimestre = Math.floor(now.getMonth() / 3);
+        start = new Date(now.getFullYear(), trimestre * 3, 1);
+        end = new Date(now.getFullYear(), (trimestre + 1) * 3, 1);
+        break;
+      case 'anual':
+        start = new Date(now.getFullYear(), 0, 1);
+        end = new Date(now.getFullYear() + 1, 0, 1);
+        break;
+      default:
+        start = new Date(now.getFullYear(), now.getMonth(), 1);
+        end = new Date(now.getFullYear(), now.getMonth() + 1, 1);
     }
-    query += ' ORDER BY anio DESC, mes DESC LIMIT 48';
 
-    const [rows] = await pool.query(query, params);
+    const startStr = start.toISOString().slice(0, 19).replace('T', ' ');
+    const endStr = end.toISOString().slice(0, 19).replace('T', ' ');
 
-    // Si se pidió un tipo de agrupación específico, podemos transformar aquí (por ejemplo, "trimestre")
+    // Intentar usar la vista si existe, sino calcular manualmente
+    try {
+      let query = `SELECT anio, mes, trimestre, periodo, ingreso_total, unidades_vendidas 
+                   FROM vista_ventas_temporada 
+                   WHERE fecha_venta >= ? AND fecha_venta < ?
+                   ORDER BY anio DESC, mes DESC LIMIT 48`;
+      const [rows] = await pool.query(query, [startStr, endStr]);
+
+      if (rows.length > 0) {
+        // Si se pidió trimestre, agrupar
     if (periodo === 'trimestre') {
-      // agrupar por año+trimestre
+          const grouped = {};
+          for (const r of rows) {
+            const key = `${r.anio}-T${r.trimestre}`;
+            if (!grouped[key]) grouped[key] = { periodo: key, ingreso_total: 0, unidades_vendidas: 0 };
+            grouped[key].ingreso_total += Number(r.ingreso_total || 0);
+            grouped[key].unidades_vendidas += Number(r.unidades_vendidas || 0);
+          }
+          return res.json({ ok: true, periodo: 'trimestre', rows: Object.values(grouped) });
+        }
+        return res.json({ ok: true, periodo, rows });
+      }
+    } catch (viewError) {
+      console.log('Vista no disponible, calculando manualmente:', viewError.message);
+    }
+
+    // Fallback: calcular manualmente desde ventas
+    const [ventas] = await pool.query(
+      `SELECT 
+        DATE_FORMAT(v.fecha_hora, '%Y') AS anio,
+        DATE_FORMAT(v.fecha_hora, '%m') AS mes,
+        QUARTER(v.fecha_hora) AS trimestre,
+        DATE_FORMAT(v.fecha_hora, '%Y-%m') AS periodo,
+        SUM(v.total_venta) AS ingreso_total,
+        SUM((SELECT SUM(dv.cantidad) FROM detalleventa dv WHERE dv.id_venta = v.id_venta)) AS unidades_vendidas
+      FROM ventas v
+      WHERE v.fecha_hora >= ? AND v.fecha_hora < ?
+      GROUP BY anio, mes, trimestre, periodo
+      ORDER BY anio DESC, mes DESC`,
+      [startStr, endStr]
+    );
+
+    const rows = ventas.map(v => ({
+      anio: Number(v.anio || 0),
+      mes: Number(v.mes || 0),
+      trimestre: Number(v.trimestre || 0),
+      periodo: v.periodo || '',
+      ingreso_total: Number(v.ingreso_total || 0),
+      unidades_vendidas: Number(v.unidades_vendidas || 0)
+    }));
+
+    if (periodo === 'trimestre') {
       const grouped = {};
       for (const r of rows) {
         const key = `${r.anio}-T${r.trimestre}`;
@@ -1862,103 +2072,618 @@ app.get('/api/reportes/ventas-temporada', requiereRol('administrador'), async (r
   }
 });
 
+// ==================== CONTABILIDAD ====================
+// Endpoint para ingresos por ventas
+app.get('/api/contabilidad/ingresos', requiereRol('administrador'), async (req, res) => {
+  try {
+    const periodo = req.query.periodo || 'mes';
+    const now = new Date();
+    let start, end;
+    
+    switch(periodo) {
+      case 'mes':
+        start = new Date(now.getFullYear(), now.getMonth(), 1);
+        end = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+        break;
+      case 'trimestre':
+        const trimestre = Math.floor(now.getMonth() / 3);
+        start = new Date(now.getFullYear(), trimestre * 3, 1);
+        end = new Date(now.getFullYear(), (trimestre + 1) * 3, 1);
+        break;
+      case 'anual':
+        start = new Date(now.getFullYear(), 0, 1);
+        end = new Date(now.getFullYear() + 1, 0, 1);
+        break;
+      default:
+        start = new Date(now.getFullYear(), now.getMonth(), 1);
+        end = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+    }
+    
+    const startStr = start.toISOString().slice(0, 19).replace('T', ' ');
+    const endStr = end.toISOString().slice(0, 19).replace('T', ' ');
+    
+    const [ingresos] = await pool.query(
+      `SELECT fecha_hora, total_venta, tipo_pago 
+       FROM ventas 
+       WHERE fecha_hora >= ? AND fecha_hora < ? 
+       ORDER BY fecha_hora DESC`,
+      [startStr, endStr]
+    );
+    
+    res.json({ ok: true, ingresos });
+  } catch (e) {
+    console.error('Error /api/contabilidad/ingresos:', e.message || e);
+    res.status(500).json({ ok: false, ingresos: [], error: 'Error del servidor' });
+  }
+});
+
+// Endpoint para reporte de utilidad por productos
+app.get('/api/reportes/utilidad-productos', requiereRol('administrador'), async (req, res) => {
+  try {
+    const [rows] = await pool.query(
+      `SELECT 
+        p.id_producto,
+        p.nombre,
+        p.marca,
+        p.precio_venta,
+        COALESCE(AVG(dc.costo_unitario), 0) AS costo_promedio,
+        COALESCE(SUM(dv.cantidad), 0) AS unidades_vendidas,
+        COALESCE(SUM(dv.cantidad * dv.precio_unitario), 0) AS total_ventas,
+        COALESCE(SUM(dv.cantidad * COALESCE(dc.costo_unitario, 0)), 0) AS total_costos,
+        (COALESCE(SUM(dv.cantidad * dv.precio_unitario), 0) - COALESCE(SUM(dv.cantidad * COALESCE(dc.costo_unitario, 0)), 0)) AS utilidad_total,
+        (p.precio_venta - COALESCE(AVG(dc.costo_unitario), 0)) AS utilidad_unitaria,
+        CASE 
+          WHEN p.precio_venta > 0 THEN 
+            ((p.precio_venta - COALESCE(AVG(dc.costo_unitario), 0)) / p.precio_venta) * 100
+          ELSE 0
+        END AS margen_porcentaje
+      FROM productos p
+      LEFT JOIN detalleventa dv ON p.id_producto = dv.id_producto
+      LEFT JOIN detallecompra dc ON p.id_producto = dc.id_producto
+      GROUP BY p.id_producto, p.nombre, p.marca, p.precio_venta
+      HAVING unidades_vendidas > 0
+      ORDER BY utilidad_total DESC`
+    );
+    
+    const utilidad = rows.map(r => ({
+      nombre: `${r.marca || ''} ${r.nombre || ''}`.trim(),
+      costo_promedio: Number(r.costo_promedio || 0),
+      precio_venta: Number(r.precio_venta || 0),
+      utilidad_unitaria: Number(r.utilidad_unitaria || 0),
+      unidades_vendidas: Number(r.unidades_vendidas || 0),
+      utilidad_total: Number(r.utilidad_total || 0),
+      margen_porcentaje: Number(r.margen_porcentaje || 0)
+    }));
+    
+    res.json({ ok: true, utilidad });
+  } catch (e) {
+    console.error('Error /api/reportes/utilidad-productos:', e.message || e);
+    res.status(500).json({ ok: false, utilidad: [], error: 'Error del servidor' });
+  }
+});
+
 app.get('/api/reportes/rotacion-inventario', requiereRol('administrador'), async (req, res) => {
   try {
     const top = Math.max(1, Math.min(500, Number(req.query.top) || 100));
+    // Intentar usar la vista si existe, sino calcular manualmente
+    try {
     const [rows] = await pool.query(`SELECT id_producto, nombre, marca, categoria, stock_actual, unidades_vendidas_ultimo_mes, indice_rotacion FROM vista_rotacion_inventario ORDER BY indice_rotacion DESC LIMIT ?`, [top]);
     return res.json({ ok: true, rows });
+    } catch (viewError) {
+      // Si la vista no existe, calcular manualmente
+      const now = new Date();
+      const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const startStr = lastMonth.toISOString().slice(0, 19).replace('T', ' ');
+      const endStr = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 19).replace('T', ' ');
+      
+      const [rows] = await pool.query(
+        `SELECT 
+          p.id_producto,
+          p.nombre,
+          p.marca,
+          c.nombre AS categoria,
+          p.inventario AS stock_actual,
+          COALESCE(SUM(dv.cantidad), 0) AS unidades_vendidas_ultimo_mes,
+          CASE 
+            WHEN p.inventario > 0 THEN COALESCE(SUM(dv.cantidad), 0) / p.inventario
+            ELSE 0
+          END AS indice_rotacion
+        FROM productos p
+        LEFT JOIN categorias c ON p.id_categoria = c.id_categoria
+        LEFT JOIN detalleventa dv ON p.id_producto = dv.id_producto
+        LEFT JOIN ventas v ON dv.id_venta = v.id_venta
+        WHERE v.fecha_hora >= ? AND v.fecha_hora < ?
+        GROUP BY p.id_producto, p.nombre, p.marca, c.nombre, p.inventario
+        ORDER BY indice_rotacion DESC
+        LIMIT ?`,
+        [startStr, endStr, top]
+      );
+      return res.json({ ok: true, rows });
+    }
   } catch (e) {
     console.error('Error reportes rotacion-inventario:', e.message || e);
     res.status(500).json({ ok: false, rows: [], message: 'Error al obtener rotación de inventario' });
   }
 });
 
-// Reporte: Inventario actual por producto (y tallas)
+// Endpoint para reporte de inventario actual
 app.get('/api/reportes/inventario-actual', requiereRol('administrador'), async (req, res) => {
   try {
-    const [prods] = await pool.query(
-      `SELECT p.id_producto, p.nombre, p.marca, c.nombre AS categoria
+    const [productos] = await pool.query(
+      `SELECT p.id_producto, p.nombre, p.marca, p.inventario AS stock_total, c.nombre AS categoria
        FROM productos p
        LEFT JOIN categorias c ON p.id_categoria = c.id_categoria
        ORDER BY p.marca, p.nombre`
     );
-    const ids = prods.map(p => p.id_producto);
-    let invMap = new Map();
-    if (ids.length > 0) {
-      const placeholders = ids.map(_ => '?').join(',');
-      const [inv] = await pool.query(
-        `SELECT i.id_producto, i.id_talla, t.nombre AS talla, i.cantidad
+    
+    // Para cada producto, obtener tallas con cantidades
+    for (const prod of productos) {
+      const [tallas] = await pool.query(
+        `SELECT t.nombre AS talla, i.cantidad
          FROM inventario i
-         LEFT JOIN tallas t ON t.id_talla = i.id_talla
-         WHERE i.id_producto IN (${placeholders})
-         ORDER BY t.nombre`, ids);
-      for (const r of inv) {
-        const arr = invMap.get(r.id_producto) || [];
-        arr.push({ id_talla: r.id_talla, talla: r.talla, cantidad: Number(r.cantidad||0) });
-        invMap.set(r.id_producto, arr);
-      }
+         LEFT JOIN tallas t ON i.id_talla = t.id_talla
+         WHERE i.id_producto = ?
+         ORDER BY t.nombre`,
+        [prod.id_producto]
+      );
+      prod.tallas = tallas;
     }
-    const rows = prods.map(p => {
-      const tallas = invMap.get(p.id_producto) || [];
-      const stock_total = tallas.reduce((s, t) => s + Number(t.cantidad||0), 0);
-      return { id_producto: p.id_producto, nombre: p.nombre, marca: p.marca, categoria: p.categoria || 'Sin categoría', stock_total, tallas };
-    });
-    return res.json({ ok: true, rows });
+    
+    res.json({ ok: true, rows: productos });
   } catch (e) {
-    console.error('Error reporte inventario-actual:', e.message || e);
-    return res.status(500).json({ ok: false, rows: [] });
+    console.error('Error /api/reportes/inventario-actual:', e.message || e);
+    res.status(500).json({ ok: false, rows: [], error: 'Error del servidor' });
   }
 });
 
-// Reporte: Compras por periodo (detalle y totales por proveedor)
+// Endpoint para reporte de compras por periodo
 app.get('/api/reportes/compras-periodo', requiereRol('administrador'), async (req, res) => {
   try {
-    // Fechas opcionales; por defecto último mes
     const start = req.query.start || null;
     const end = req.query.end || null;
-    let where = '1=1';
-    const params = [];
-    if (start) { where += ' AND c.fecha_compra >= ?'; params.push(start); }
-    if (end) { where += ' AND c.fecha_compra <= ?'; params.push(end); }
-
-    const [rows] = await pool.query(
-      `SELECT c.id_compra, c.fecha_compra, c.total_compra, c.estado_pago,
-              p.nombre AS proveedor,
-              dc.id_producto, pr.marca, pr.nombre AS producto, dc.cantidad, dc.costo_unitario
+    
+    let query = `
+      SELECT 
+        c.id_compra,
+        c.fecha_compra,
+        pr.nombre AS proveedor,
+        dc.id_producto,
+        p.marca,
+        p.nombre AS producto,
+        dc.cantidad,
+        dc.costo_unitario,
+        (dc.cantidad * dc.costo_unitario) AS total_linea
        FROM compras c
-       LEFT JOIN proveedores p ON p.id_proveedor = c.id_proveedor
-       LEFT JOIN detallecompra dc ON dc.id_compra = c.id_compra
-       LEFT JOIN productos pr ON pr.id_producto = dc.id_producto
-       WHERE ${where}
-       ORDER BY c.fecha_compra DESC, c.id_compra DESC`
-      , params);
+      LEFT JOIN proveedores pr ON c.id_proveedor = pr.id_proveedor
+      LEFT JOIN detallecompra dc ON c.id_compra = dc.id_compra
+      LEFT JOIN productos p ON dc.id_producto = p.id_producto
+      WHERE 1=1
+    `;
+    const params = [];
+    
+    if (start) {
+      query += ' AND c.fecha_compra >= ?';
+      params.push(start + ' 00:00:00');
+    }
+    if (end) {
+      query += ' AND c.fecha_compra <= ?';
+      params.push(end + ' 23:59:59');
+    }
+    
+    query += ' ORDER BY c.fecha_compra DESC, c.id_compra';
+    
+    const [compras] = await pool.query(query, params);
 
     // Agrupar por proveedor
-    const proveedorMap = new Map();
-    for (const r of rows) {
-      const prov = r.proveedor || 'Sin proveedor';
-      if (!proveedorMap.has(prov)) proveedorMap.set(prov, { proveedor: prov, subtotal: 0, compras: [] });
-      const grupo = proveedorMap.get(prov);
-      const lineaTotal = Number(r.cantidad||0) * Number(r.costo_unitario||0);
-      grupo.subtotal += lineaTotal;
-      grupo.compras.push({
-        id_compra: r.id_compra,
-        fecha_compra: r.fecha_compra,
-        estado_pago: r.estado_pago,
-        total_compra: Number(r.total_compra||0),
-        id_producto: r.id_producto,
-        marca: r.marca,
-        producto: r.producto,
-        cantidad: Number(r.cantidad||0),
-        costo_unitario: Number(r.costo_unitario||0),
-        total_linea: lineaTotal
-      });
-    }
-    const grupos = Array.from(proveedorMap.values());
-    const total_general = grupos.reduce((s,g)=> s + Number(g.subtotal||0), 0);
-    return res.json({ ok: true, grupos, total_general });
+    const grupos = {};
+    let totalGeneral = 0;
+    
+    compras.forEach(compra => {
+      const prov = compra.proveedor || 'Sin proveedor';
+      if (!grupos[prov]) {
+        grupos[prov] = { proveedor: prov, compras: [] };
+      }
+      grupos[prov].compras.push(compra);
+      totalGeneral += Number(compra.total_linea || 0);
+    });
+    
+    res.json({ ok: true, grupos: Object.values(grupos), total_general: totalGeneral });
   } catch (e) {
-    console.error('Error reporte compras-periodo:', e.message || e);
-    return res.status(500).json({ ok: false, grupos: [], total_general: 0 });
+    console.error('Error /api/reportes/compras-periodo:', e.message || e);
+    res.status(500).json({ ok: false, grupos: [], error: 'Error del servidor' });
+  }
+});
+
+// ==================== CUENTAS POR PAGAR ====================
+// Endpoint para obtener cuentas por pagar desde compras
+app.get('/api/cuentas-pagar', requiereRol('administrador'), async (req, res) => {
+  try {
+    // Obtener tasa de cambio actual
+    let tasaDolar = 36.0; // Valor por defecto
+    try {
+      // Intentar obtener desde la API de tasa BCV del mismo servidor
+      const fetch = require('node-fetch');
+      const tasaRes = await fetch('http://localhost:3000/api/tasa-bcv', { timeout: 2000 }).catch(() => null);
+      if (tasaRes && tasaRes.ok) {
+        const tasaData = await tasaRes.json();
+        tasaDolar = Number(tasaData.tasa || 36.0);
+      }
+  } catch (e) {
+      console.log('No se pudo obtener tasa, usando default:', e.message);
+    }
+
+    // Obtener compras con estado pendiente o parcial
+    const [compras] = await pool.query(
+      `SELECT 
+        c.id_compra,
+        c.fecha_compra,
+        c.total_compra,
+        c.estado_pago,
+        pr.nombre AS nombre_proveedor,
+        pr.id_proveedor,
+        cpp.id_cuenta,
+        cpp.monto_total,
+        cpp.monto_pagado,
+        cpp.monto_pendiente,
+        cpp.fecha_vencimiento,
+        cpp.estado AS estado_cuenta
+      FROM compras c
+      LEFT JOIN proveedores pr ON c.id_proveedor = pr.id_proveedor
+      LEFT JOIN cuentas_por_pagar cpp ON c.id_compra = cpp.id_compra
+      WHERE c.estado_pago IN ('Pendiente', 'Parcial')
+      ORDER BY c.fecha_compra DESC`
+    );
+
+    const cuentas = compras.map(compra => {
+      // Obtener monto total desde la compra o desde cuentas_por_pagar
+      const montoTotal = Number(compra.monto_total || compra.total_compra || 0);
+      const montoPagado = Number(compra.monto_pagado || 0);
+      const montoPendiente = montoTotal - montoPagado;
+      const porcentajePendiente = montoTotal > 0 ? ((montoPendiente / montoTotal) * 100).toFixed(2) : '100.00';
+      
+      // Calcular fecha de vencimiento (30 días después de la compra)
+      const fechaCompra = new Date(compra.fecha_compra);
+      const fechaVencimiento = new Date(fechaCompra);
+      fechaVencimiento.setDate(fechaVencimiento.getDate() + 30);
+      
+      return {
+        id_cuenta: compra.id_cuenta || compra.id_compra,
+        id_compra: compra.id_compra,
+        nombre_proveedor: compra.nombre_proveedor || 'Sin proveedor',
+        monto_total: montoTotal,
+        monto_pagado: montoPagado,
+        monto_pendiente: montoPendiente,
+        porcentaje_pendiente: porcentajePendiente,
+        fecha_compra: compra.fecha_compra,
+        fecha_vencimiento: compra.fecha_vencimiento || fechaVencimiento.toISOString().split('T')[0],
+        estado: compra.estado_pago,
+        monto_total_usd: montoTotal,
+        monto_total_bs: (montoTotal * tasaDolar).toFixed(2),
+        monto_pendiente_usd: montoPendiente,
+        monto_pendiente_bs: (montoPendiente * tasaDolar).toFixed(2),
+        tasa_dolar: tasaDolar
+      };
+    });
+
+    res.json({ ok: true, cuentas });
+  } catch (e) {
+    console.error('Error /api/cuentas-pagar:', e.message || e);
+    res.status(500).json({ ok: false, cuentas: [], error: 'Error del servidor' });
+  }
+});
+
+// Endpoint para registrar pago de cuenta por pagar
+app.post('/api/cuentas-pagar/pagar', requiereRol('administrador'), async (req, res) => {
+  let conn;
+  try {
+    const { id_compra, monto_pagado, estado_pago, metodo_pago, referencia, notas } = req.body;
+    conn = await pool.getConnection();
+    await conn.beginTransaction();
+
+    // Actualizar o crear cuenta por pagar
+    const [cuentaExist] = await conn.query(
+      'SELECT id_cuenta, monto_total, monto_pagado FROM cuentas_por_pagar WHERE id_compra = ?',
+      [id_compra]
+    );
+
+    // Obtener monto total desde la compra si no existe en cuentas_por_pagar
+    let montoTotal = 0;
+    if (cuentaExist.length > 0) {
+      montoTotal = Number(cuentaExist[0].monto_total || 0);
+    } else {
+      const [compra] = await conn.query('SELECT total_compra FROM compras WHERE id_compra = ?', [id_compra]);
+      montoTotal = compra.length > 0 ? Number(compra[0].total_compra || 0) : Number(req.body.monto_total || 0);
+    }
+    
+    const montoPagadoAnterior = cuentaExist.length > 0 ? Number(cuentaExist[0].monto_pagado || 0) : 0;
+    const nuevoMontoPagado = montoPagadoAnterior + Number(monto_pagado || 0);
+    const nuevoMontoPendiente = montoTotal - nuevoMontoPagado;
+
+    let nuevoEstado = 'PENDIENTE';
+    if (nuevoMontoPendiente <= 0) {
+      nuevoEstado = 'PAGADA';
+    } else if (nuevoMontoPagado > 0) {
+      nuevoEstado = 'PARCIAL';
+    }
+
+    // Obtener id_cuenta (crear si no existe)
+    let idCuenta = cuentaExist.length > 0 ? cuentaExist[0].id_cuenta : null;
+    
+    if (!idCuenta) {
+      // Crear cuenta si no existe
+      const fechaCompra = new Date();
+      const fechaVencimiento = new Date(fechaCompra);
+      fechaVencimiento.setDate(fechaVencimiento.getDate() + 30);
+      
+      const [compra] = await conn.query('SELECT id_proveedor, total_compra FROM compras WHERE id_compra = ?', [id_compra]);
+      const idProveedor = compra.length > 0 ? compra[0].id_proveedor : null;
+      const montoTotalCompra = compra.length > 0 ? Number(compra[0].total_compra || 0) : montoTotal;
+
+      const [result] = await conn.query(
+        `INSERT INTO cuentas_por_pagar 
+         (id_proveedor, id_compra, monto_total, monto_pagado, monto_pendiente, fecha_vencimiento, estado)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [idProveedor, id_compra, montoTotalCompra, nuevoMontoPagado, nuevoMontoPendiente, fechaVencimiento.toISOString().split('T')[0], nuevoEstado]
+      );
+      idCuenta = result.insertId;
+    } else {
+      // Actualizar cuenta existente
+      await conn.query(
+        `UPDATE cuentas_por_pagar 
+         SET monto_pagado = ?, monto_pendiente = ?, estado = ?
+         WHERE id_cuenta = ?`,
+        [nuevoMontoPagado, nuevoMontoPendiente, nuevoEstado, idCuenta]
+      );
+    }
+
+    // Registrar pago en tabla pagos_proveedores
+    await conn.query(
+      `INSERT INTO pagos_proveedores 
+       (id_cuenta, monto, metodo_pago, referencia, id_usuario, notas)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [idCuenta, monto_pagado, metodo_pago || 'EFECTIVO', referencia || null, req.session.user.id, notas || null]
+    );
+
+    // Actualizar estado de la compra
+    await conn.query(
+      'UPDATE compras SET estado_pago = ? WHERE id_compra = ?',
+      [nuevoEstado, id_compra]
+    );
+
+    await conn.commit();
+    res.json({ ok: true, message: 'Pago registrado correctamente' });
+  } catch (e) {
+    if (conn) await conn.rollback();
+    console.error('Error /api/cuentas-pagar/pagar:', e.message || e);
+    res.status(500).json({ ok: false, error: 'Error del servidor' });
+  } finally {
+    if (conn) conn.release();
+  }
+});
+
+// ==================== CONTROL DE CAJA ====================
+// Endpoint para obtener movimientos de caja
+app.get('/api/caja/movimientos', requiereRol('administrador'), async (req, res) => {
+  try {
+    const [movimientos] = await pool.query(
+      `SELECT 
+        mc.id_movimiento,
+        mc.tipo_movimiento AS tipo,
+        mc.monto,
+        mc.descripcion,
+        mc.fecha_hora,
+        u.usuario AS nombre_usuario,
+        mc.referencia_id AS referencia
+      FROM movimientoscaja mc
+      LEFT JOIN usuarios u ON mc.id_usuario = u.id_usuario
+      ORDER BY mc.fecha_hora DESC
+      LIMIT 500`
+    );
+
+    res.json({ ok: true, movimientos });
+  } catch (e) {
+    console.error('Error /api/caja/movimientos:', e.message || e);
+    res.status(500).json({ ok: false, movimientos: [], error: 'Error del servidor' });
+  }
+});
+
+// ==================== CONCILIACIÓN BANCARIA ====================
+// Endpoint para obtener conciliaciones
+app.get('/api/conciliaciones', requiereRol('administrador'), async (req, res) => {
+  try {
+    const [conciliaciones] = await pool.query(
+      `SELECT 
+        id_conciliacion,
+        fecha_conciliacion,
+        saldo_libro,
+        saldo_banco,
+        diferencia,
+        estado,
+        notas,
+        fecha_registro
+      FROM conciliacion_bancaria
+      ORDER BY fecha_conciliacion DESC
+      LIMIT 100`
+    );
+
+    res.json({ ok: true, conciliaciones });
+  } catch (e) {
+    console.error('Error /api/conciliaciones:', e.message || e);
+    res.status(500).json({ ok: false, conciliaciones: [], error: 'Error del servidor' });
+  }
+});
+
+// Endpoint para crear conciliación
+app.post('/api/conciliaciones', requiereRol('administrador'), async (req, res) => {
+  try {
+    const { fecha_conciliacion, saldo_libro, saldo_banco, notas } = req.body;
+    const diferencia = Number(saldo_libro) - Number(saldo_banco);
+    const estado = Math.abs(diferencia) < 0.01 ? 'CONCILIADA' : 'CON_DIFERENCIAS';
+
+    const [result] = await pool.query(
+      `INSERT INTO conciliacion_bancaria 
+       (fecha_conciliacion, saldo_libro, saldo_banco, diferencia, estado, notas, id_usuario)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [fecha_conciliacion, saldo_libro, saldo_banco, diferencia, estado, notas || null, req.session.user.id]
+    );
+
+    res.json({ ok: true, id_conciliacion: result.insertId });
+  } catch (e) {
+    console.error('Error /api/conciliaciones POST:', e.message || e);
+    res.status(500).json({ ok: false, error: 'Error del servidor' });
+  }
+});
+
+// ==================== REPORTES MEJORADOS ====================
+// Reporte de ventas con totales por tipo de pago
+app.get('/api/reportes/ventas-detalle', requiereRol('administrador'), async (req, res) => {
+  try {
+    const now = new Date();
+    const year = Number(req.query.year) || now.getFullYear();
+    const month = Number(req.query.month) || (now.getMonth() + 1);
+    const start = new Date(year, month - 1, 1);
+    const end = new Date(year, month, 1);
+    const startStr = `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2,'0')}-01 00:00:00`;
+    const endStr = `${end.getFullYear()}-${String(end.getMonth() + 1).padStart(2,'0')}-01 00:00:00`;
+
+    const [ventas] = await pool.query(
+      `SELECT 
+        v.id_venta,
+        v.fecha_hora,
+        v.total_venta,
+        v.tipo_pago,
+        c.nombre AS cliente,
+        u.usuario AS vendedor
+      FROM ventas v
+      LEFT JOIN clientes c ON v.id_cliente = c.id_cliente
+      LEFT JOIN usuarios u ON v.id_usuario = u.id_usuario
+      WHERE v.fecha_hora >= ? AND v.fecha_hora < ?
+      ORDER BY v.fecha_hora DESC`,
+      [startStr, endStr]
+    );
+
+    // Calcular totales por tipo de pago
+    const totales = {
+      efectivo: 0,
+      pago_movil: 0,
+      transferencia: 0,
+      tarjeta: 0,
+      total: 0
+    };
+
+    ventas.forEach(v => {
+      const monto = Number(v.total_venta || 0);
+      totales.total += monto;
+      const tipo = (v.tipo_pago || '').toLowerCase();
+      if (tipo.includes('efectivo')) totales.efectivo += monto;
+      else if (tipo.includes('movil') || tipo.includes('pago móvil')) totales.pago_movil += monto;
+      else if (tipo.includes('transferencia')) totales.transferencia += monto;
+      else if (tipo.includes('tarjeta')) totales.tarjeta += monto;
+      else totales.efectivo += monto; // Por defecto
+    });
+
+    res.json({ ok: true, ventas, totales });
+  } catch (e) {
+    console.error('Error /api/reportes/ventas-detalle:', e.message || e);
+    res.status(500).json({ ok: false, ventas: [], totales: {}, error: 'Error del servidor' });
+  }
+});
+
+// Reporte de margen de ganancia por categoría
+app.get('/api/reportes/margen-categoria', requiereRol('administrador'), async (req, res) => {
+  try {
+    // Primero obtener todas las categorías
+    const [categorias] = await pool.query('SELECT id_categoria, nombre FROM categorias ORDER BY nombre');
+    
+    // Luego calcular estadísticas para cada categoría
+    const categoriasConDatos = await Promise.all(categorias.map(async (cat) => {
+      const [stats] = await pool.query(
+        `SELECT 
+          COUNT(DISTINCT p.id_producto) AS total_productos,
+          COALESCE(AVG(p.precio_venta), 0) AS precio_promedio,
+          COALESCE(AVG(dc.costo_unitario), 0) AS costo_promedio,
+          COALESCE(SUM(dv.cantidad * dv.precio_unitario), 0) AS total_ventas,
+          COALESCE(SUM(dv.cantidad * COALESCE(dc.costo_unitario, 0)), 0) AS total_costos,
+          COALESCE(SUM(dv.cantidad * dv.precio_unitario), 0) - COALESCE(SUM(dv.cantidad * COALESCE(dc.costo_unitario, 0)), 0) AS utilidad_total
+        FROM categorias c
+        LEFT JOIN productos p ON c.id_categoria = p.id_categoria
+        LEFT JOIN detalleventa dv ON p.id_producto = dv.id_producto
+        LEFT JOIN detallecompra dc ON p.id_producto = dc.id_producto
+        WHERE c.id_categoria = ?
+        GROUP BY c.id_categoria, c.nombre`,
+        [cat.id_categoria]
+      );
+      
+      const stat = stats[0] || {};
+      const precioPromedio = Number(stat.precio_promedio || 0);
+      const costoPromedio = Number(stat.costo_promedio || 0);
+      const margenPromedio = precioPromedio > 0 ? ((precioPromedio - costoPromedio) / precioPromedio) * 100 : 0;
+      
+      return {
+        categoria: cat.nombre || 'Sin categoría',
+        total_productos: Number(stat.total_productos || 0),
+        precio_promedio: precioPromedio,
+        costo_promedio: costoPromedio,
+        total_ventas: Number(stat.total_ventas || 0),
+        total_costos: Number(stat.total_costos || 0),
+        utilidad_total: Number(stat.utilidad_total || 0),
+        margen_promedio: margenPromedio
+      };
+    }));
+
+    // Ordenar por utilidad total descendente
+    categoriasConDatos.sort((a, b) => b.utilidad_total - a.utilidad_total);
+
+    res.json({ ok: true, categorias: categoriasConDatos });
+  } catch (e) {
+    console.error('Error /api/reportes/margen-categoria:', e.message || e);
+    res.status(500).json({ ok: false, categorias: [], error: 'Error del servidor' });
+  }
+});
+
+// Reporte top 10 utilidad por producto
+app.get('/api/reportes/utilidad-top10', requiereRol('administrador'), async (req, res) => {
+  try {
+    const [rows] = await pool.query(
+      `SELECT 
+        p.id_producto,
+        p.nombre,
+        p.marca,
+        p.precio_venta,
+        COALESCE(AVG(dc.costo_unitario), 0) AS costo_promedio,
+        COALESCE(SUM(dv.cantidad), 0) AS unidades_vendidas,
+        COALESCE(SUM(dv.cantidad * dv.precio_unitario), 0) AS total_ventas,
+        COALESCE(SUM(dv.cantidad * COALESCE(dc.costo_unitario, 0)), 0) AS total_costos,
+        (COALESCE(SUM(dv.cantidad * dv.precio_unitario), 0) - COALESCE(SUM(dv.cantidad * COALESCE(dc.costo_unitario, 0)), 0)) AS utilidad_total,
+        (p.precio_venta - COALESCE(AVG(dc.costo_unitario), 0)) AS utilidad_unitaria,
+        CASE 
+          WHEN p.precio_venta > 0 THEN 
+            ((p.precio_venta - COALESCE(AVG(dc.costo_unitario), 0)) / p.precio_venta) * 100
+          ELSE 0
+        END AS margen_porcentaje
+      FROM productos p
+      LEFT JOIN detalleventa dv ON p.id_producto = dv.id_producto
+      LEFT JOIN detallecompra dc ON p.id_producto = dc.id_producto
+      GROUP BY p.id_producto, p.nombre, p.marca, p.precio_venta
+      HAVING unidades_vendidas > 0
+      ORDER BY utilidad_total DESC
+      LIMIT 10`
+    );
+
+    const productos = rows.map(r => ({
+      nombre: `${r.marca || ''} ${r.nombre || ''}`.trim(),
+      costo_promedio: Number(r.costo_promedio || 0),
+      precio_venta: Number(r.precio_venta || 0),
+      utilidad_unitaria: Number(r.utilidad_unitaria || 0),
+      unidades_vendidas: Number(r.unidades_vendidas || 0),
+      total_ventas: Number(r.total_ventas || 0),
+      utilidad_total: Number(r.utilidad_total || 0),
+      margen_porcentaje: Number(r.margen_porcentaje || 0)
+    }));
+
+    res.json({ ok: true, productos });
+  } catch (e) {
+    console.error('Error /api/reportes/utilidad-top10:', e.message || e);
+    res.status(500).json({ ok: false, productos: [], error: 'Error del servidor' });
   }
 });

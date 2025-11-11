@@ -56,6 +56,36 @@
             if (tab === 'dashboard') {
                 cargarDashboardData();
             }
+            // Cargar contabilidad si se selecciona
+            if (tab === 'contabilidad') {
+                setTimeout(() => {
+                    if (typeof cargarIngresos === 'function') cargarIngresos();
+                }, 100);
+            }
+            // Cargar cuentas por pagar
+            if (tab === 'cuentas_pagar') {
+                setTimeout(() => {
+                    if (typeof cargarCuentasPagar === 'function') cargarCuentasPagar();
+                }, 100);
+            }
+            // Cargar control de caja
+            if (tab === 'caja') {
+                setTimeout(() => {
+                    if (typeof cargarMovimientosCaja === 'function') cargarMovimientosCaja();
+                }, 100);
+            }
+            // Cargar conciliación
+            if (tab === 'conciliacion') {
+                setTimeout(() => {
+                    if (typeof cargarConciliaciones === 'function') cargarConciliaciones();
+                }, 100);
+            }
+            // Cargar reporte de utilidad si se selecciona reportes
+            if (tab === 'reportes') {
+                setTimeout(() => {
+                    if (typeof cargarReporteUtilidad === 'function') cargarReporteUtilidad();
+                }, 100);
+            }
         }
     }
     function switchCatalogTab(tab) {
@@ -78,6 +108,68 @@
             document.getElementById('catalog-proveedores').style.display = 'block';
             document.getElementById('cat-tab-proveedores').classList.add('active');
         }
+    }
+    
+    // Función para toggle del submenú de reportes
+    function toggleReportesSubmenu() {
+        const submenu = document.getElementById('reportesSubmenu');
+        const arrow = document.querySelector('.has-submenu .submenu-arrow');
+        if (submenu) {
+            const isVisible = submenu.style.display !== 'none';
+            submenu.style.display = isVisible ? 'none' : 'block';
+            if (arrow) {
+                arrow.textContent = isVisible ? '▼' : '▲';
+            }
+        }
+    }
+    
+    // Función para cambiar entre pestañas de reportes
+    function switchReporteTab(tab) {
+        // Ocultar todos los reportes
+        const reporteSections = document.querySelectorAll('.reporte-section');
+        reporteSections.forEach(section => section.style.display = 'none');
+        
+        // Remover active de todos los botones
+        const reporteTabs = document.querySelectorAll('.reporte-tab');
+        reporteTabs.forEach(btn => btn.classList.remove('active'));
+        
+        // Mostrar el reporte seleccionado
+        const targetSection = document.getElementById(`reporte-${tab}`);
+        const targetTab = document.getElementById(`tab-${tab}`);
+        
+        if (targetSection) {
+            targetSection.style.display = 'block';
+        }
+        if (targetTab) {
+            targetTab.classList.add('active');
+        }
+        
+        // Cargar datos según el tipo de reporte
+        setTimeout(() => {
+            switch(tab) {
+                case 'utilidad':
+                    if (typeof cargarReporteUtilidad === 'function') cargarReporteUtilidad();
+                    break;
+                case 'inventario':
+                    if (typeof renderReporteInventario === 'function') renderReporteInventario();
+                    break;
+                case 'compras':
+                    if (typeof renderReporteCompras === 'function') renderReporteCompras();
+                    break;
+                case 'ventas':
+                    if (typeof cargarVentasAdmin === 'function') cargarVentasAdmin();
+                    break;
+                case 'clientes':
+                    if (typeof cargarClientes === 'function') cargarClientes();
+                    break;
+                case 'temporada':
+                    if (typeof fetchVentasTemporada === 'function') fetchVentasTemporada('actual');
+                    break;
+                case 'rotacion':
+                    if (typeof cargarRotacionInventario === 'function') cargarRotacionInventario();
+                    break;
+            }
+        }, 100);
     }
     // Funciones para manejar modales
     function mostrarModal(id) {
@@ -421,20 +513,20 @@
                 document.getElementById('stockBajo').textContent = data.stockBajo;
             }
 
-            // Cargar gráfico de ventas
-            if (data.ventasTemporada) {
-                cargarGraficoVentas(data.ventasTemporada);
-            }
-
-            // Cargar gráfico de márgenes
-            if (data.margenesCategoria) {
-                cargarGraficoMargenes(data.margenesCategoria);
-            }
-
-            // Cargar tabla de utilidad
-            if (data.utilidadProductos) {
-                cargarTablaUtilidad(data.utilidadProductos);
-            }
+            // Cargar gráfico de ventas por temporada
+            setTimeout(() => {
+                if (typeof fetchVentasTemporada === 'function') fetchVentasTemporada('actual');
+            }, 300);
+            
+            // Cargar gráfico de márgenes por categoría
+            setTimeout(() => {
+                if (typeof cargarMargenCategoria === 'function') cargarMargenCategoria();
+            }, 300);
+            
+            // Cargar top 10 utilidad
+            setTimeout(() => {
+                if (typeof cargarTop10Utilidad === 'function') cargarTop10Utilidad();
+            }, 300);
 
         } catch (error) {
             console.error('Error cargando dashboard:', error);
@@ -642,19 +734,64 @@
                 <div class="sidebar-section">
                     <div class="sidebar-section-title">Reportes</div>
                     <ul class="sidebar-menu">
-                        <li class="sidebar-menu-item">
-                            <a href="#" class="sidebar-menu-link" onclick="switchTab('reportes'); return false;">
+                        <li class="sidebar-menu-item has-submenu">
+                            <a href="#" class="sidebar-menu-link" onclick="toggleReportesSubmenu(); return false;">
                                 <span class="sidebar-menu-icon">📊</span>
                                 <span>Reportes</span>
+                                <span class="submenu-arrow">▼</span>
                             </a>
+                            <ul class="sidebar-submenu" id="reportesSubmenu" style="display:none;">
+                                <li class="sidebar-menu-item">
+                                    <a href="#" class="sidebar-menu-link" onclick="switchTab('reportes'); switchReporteTab('utilidad'); return false;">
+                                        <span class="sidebar-menu-icon">💰</span>
+                                        <span>Utilidad por Producto</span>
+                                    </a>
+                                </li>
+                                <li class="sidebar-menu-item">
+                                    <a href="#" class="sidebar-menu-link" onclick="switchTab('reportes'); switchReporteTab('inventario'); return false;">
+                                        <span class="sidebar-menu-icon">📦</span>
+                                        <span>Inventario</span>
+                                    </a>
+                                </li>
+                                <li class="sidebar-menu-item">
+                                    <a href="#" class="sidebar-menu-link" onclick="switchTab('reportes'); switchReporteTab('compras'); return false;">
+                                        <span class="sidebar-menu-icon">🛒</span>
+                                        <span>Compras</span>
+                                    </a>
+                                </li>
+                                <li class="sidebar-menu-item">
+                                    <a href="#" class="sidebar-menu-link" onclick="switchTab('reportes'); switchReporteTab('ventas'); return false;">
+                                        <span class="sidebar-menu-icon">💵</span>
+                                        <span>Ventas</span>
+                                    </a>
+                                </li>
+                                <li class="sidebar-menu-item">
+                                    <a href="#" class="sidebar-menu-link" onclick="switchTab('reportes'); switchReporteTab('clientes'); return false;">
+                                        <span class="sidebar-menu-icon">👥</span>
+                                        <span>Clientes</span>
+                                    </a>
+                                </li>
+                                <li class="sidebar-menu-item">
+                                    <a href="#" class="sidebar-menu-link" onclick="switchTab('reportes'); switchReporteTab('temporada'); return false;">
+                                        <span class="sidebar-menu-icon">📈</span>
+                                        <span>Ventas por Temporada</span>
+                                    </a>
+                                </li>
+                                <li class="sidebar-menu-item">
+                                    <a href="#" class="sidebar-menu-link" onclick="switchTab('reportes'); switchReporteTab('rotacion'); return false;">
+                                        <span class="sidebar-menu-icon">🔄</span>
+                                        <span>Rotación de Inventario</span>
+                                    </a>
+                                </li>
+                            </ul>
                         </li>
-                        <li class="sidebar-menu-item">
+                        <li class="sidebar-menu-item" style="display:none;">
                             <a href="#" class="sidebar-menu-link" onclick="switchTab('reportes'); setTimeout(()=>renderReporteInventario(),120); return false;">
                                 <span class="sidebar-menu-icon">📦</span>
                                 <span>Reporte Inventario</span>
                             </a>
                         </li>
-                        <li class="sidebar-menu-item">
+                        <li class="sidebar-menu-item" style="display:none;">
                             <a href="#" class="sidebar-menu-link" onclick="switchTab('reportes'); setTimeout(()=>renderReporteCompras(),120); return false;">
                                 <span class="sidebar-menu-icon">🧾</span>
                                 <span>Reporte Compras</span>
@@ -840,23 +977,23 @@
                         <div class="chart-container">
                             <div class="chart-header">
                                 <h4 class="chart-title">Análisis de Ventas por Temporada</h4>
-                                <select id="selectTemporada" class="input" style="width:auto;">
+                                <select id="selectTemporadaDashboard" class="input" style="width:auto;" onchange="if(typeof fetchVentasTemporada === 'function') fetchVentasTemporada(this.value)">
                                     <option value="actual">Mes Actual</option>
                                     <option value="anterior">Mes Anterior</option>
                                     <option value="trimestre">Último Trimestre</option>
                                     <option value="anual">Año Actual</option>
                                 </select>
                             </div>
-                            <div class="chart-canvas">
-                                <canvas id="ventasChart"></canvas>
+                            <div class="chart-canvas" style="height:400px;">
+                                <canvas id="temporadaChart" style="max-height:400px;"></canvas>
                             </div>
                         </div>
                         <div class="chart-container">
                             <div class="chart-header">
                                 <h4 class="chart-title">Margen de Ganancia por Categoría</h4>
                             </div>
-                            <div class="chart-canvas">
-                                <canvas id="margenChart"></canvas>
+                            <div class="chart-canvas" style="height:400px;">
+                                <canvas id="margenChart" style="max-height:400px;"></canvas>
                             </div>
                         </div>
                     </div>
@@ -915,16 +1052,7 @@
                                         <div class="col">
                                             <input id="prodPrecio" placeholder="Precio ($)" type="number" step="0.01" class="input" required>
                                         </div>
-                                        <div class="col">
-                                            <input id="prodInventario" placeholder="Inventario total" type="number" min="0" class="input" required>
-                                        </div>
                                     </div>
-                                                        <div class="row form-row">
-                                                            <fieldset style="border:1px solid #ccc; padding:10px;">
-                                                                <legend>Tallas y Cantidades</legend>
-                                                                <div id="tallas-dinamicas"></div>
-                                                            </fieldset>
-                                                        </div>
                                     <div class="row form-row">
                                         <button id="btnCrearProd" class="btn primary" type="submit">Registrar Producto</button>
                                     </div>
@@ -1334,6 +1462,51 @@
                 <div id="listaCuentasPagar" class="list">
                     <div class="item">Cargando cuentas por pagar...</div>
                 </div>
+                
+                <!-- Modal para registrar pago -->
+                <div id="modalRegistrarPago" class="modal" style="display:none;">
+                    <div class="modal-content">
+                        <span class="close" onclick="cerrarModal('modalRegistrarPago')">&times;</span>
+                        <h3>Registrar Pago</h3>
+                        <form id="formRegistrarPago">
+                            <input type="hidden" id="pagoIdCompra">
+                            <div class="field">
+                                <label>Estado de Pago</label>
+                                <select id="pagoEstado" class="input" onchange="toggleMontoPago()">
+                                    <option value="PARCIAL">Parcial</option>
+                                    <option value="PAGADA">Completa</option>
+                                </select>
+                            </div>
+                            <div class="field" id="fieldMontoPago">
+                                <label>Monto a Pagar ($)</label>
+                                <input type="number" id="pagoMonto" class="input" step="0.01" min="0.01" required oninput="calcularMontoRestante()">
+                                <small style="display:block;margin-top:4px;">
+                                    <strong>Monto pendiente total:</strong> $<span id="pagoMontoPendiente">0.00</span><br>
+                                    <strong>Quedará debiendo:</strong> $<span id="pagoMontoRestante" style="color:var(--error);font-weight:bold;">0.00</span>
+                                </small>
+                            </div>
+                            <div class="field">
+                                <label>Método de Pago</label>
+                                <select id="pagoMetodo" class="input" required>
+                                    <option value="EFECTIVO">Efectivo</option>
+                                    <option value="TRANSFERENCIA">Transferencia</option>
+                                    <option value="CHEQUE">Cheque</option>
+                                    <option value="PAGO_MOVIL">Pago Móvil</option>
+                                </select>
+                            </div>
+                            <div class="field">
+                                <label>Referencia</label>
+                                <input type="text" id="pagoReferencia" class="input" placeholder="Número de referencia, cheque, etc.">
+                            </div>
+                            <div class="field">
+                                <label>Notas</label>
+                                <textarea id="pagoNotas" class="input" rows="3" placeholder="Notas adicionales..."></textarea>
+                            </div>
+                            <button type="submit" class="btn primary">Registrar Pago</button>
+                            <button type="button" class="btn secondary" onclick="cerrarModal('modalRegistrarPago')">Cancelar</button>
+                        </form>
+                    </div>
+                </div>
             </div>
 
             <!-- PANEL DE CONTROL DE CAJA -->
@@ -1382,51 +1555,135 @@
 
             <!-- PANEL DE REPORTES -->
             <div id="reportesPanel" class="panel tabContent" style="display:none;">
-                <h3>Reportes Gerenciales</h3>
-                <div class="chart-container">
-                    <div class="chart-header">
-                        <h4 class="chart-title">Reporte de Utilidad por Producto</h4>
-                        <button onclick="exportarReporteUtilidad()" class="btn secondary">Exportar</button>
-                    </div>
-                    <div id="tablaReporteUtilidad" style="overflow-x:auto;">
-                        <table style="width:100%;border-collapse:collapse;">
-                            <thead>
-                                <tr style="background:var(--surface-alt);">
-                                    <th style="padding:var(--spacing-md);text-align:left;">Producto</th>
-                                    <th style="padding:var(--spacing-md);text-align:right;">Costo</th>
-                                    <th style="padding:var(--spacing-md);text-align:right;">Precio Venta</th>
-                                    <th style="padding:var(--spacing-md);text-align:right;">Utilidad Unitaria</th>
-                                    <th style="padding:var(--spacing-md);text-align:right;">Unidades Vendidas</th>
-                                    <th style="padding:var(--spacing-md);text-align:right;">Utilidad Total</th>
-                                    <th style="padding:var(--spacing-md);text-align:right;">Margen %</th>
-                                </tr>
-                            </thead>
-                            <tbody id="tbodyReporteUtilidad">
-                                <tr><td colspan="7" style="padding:var(--spacing-md);text-align:center;">Cargando datos...</td></tr>
-                            </tbody>
-                        </table>
+                <h2 style="color: #3b82f6; margin-bottom: 24px;">📊 Reportes Gerenciales</h2>
+                
+                <!-- Menú de pestañas de reportes -->
+                <div class="reporte-tabs-container" style="margin-bottom: 24px; border-bottom: 2px solid var(--border-color);">
+                    <button id="tab-utilidad" class="reporte-tab active" onclick="switchReporteTab('utilidad')">💰 Utilidad</button>
+                    <button id="tab-inventario" class="reporte-tab" onclick="switchReporteTab('inventario')">📦 Inventario</button>
+                    <button id="tab-compras" class="reporte-tab" onclick="switchReporteTab('compras')">🛒 Compras</button>
+                    <button id="tab-ventas" class="reporte-tab" onclick="switchReporteTab('ventas')">💵 Ventas</button>
+                    <button id="tab-clientes" class="reporte-tab" onclick="switchReporteTab('clientes')">👥 Clientes</button>
+                    <button id="tab-temporada" class="reporte-tab" onclick="switchReporteTab('temporada')">📈 Temporada</button>
+                    <button id="tab-rotacion" class="reporte-tab" onclick="switchReporteTab('rotacion')">🔄 Rotación</button>
+                </div>
+
+                <!-- Reporte: Utilidad por Producto -->
+                <div id="reporte-utilidad" class="reporte-section" style="display:block;">
+                    <div class="chart-container">
+                        <div class="chart-header">
+                            <h4 class="chart-title">Reporte de Utilidad por Producto</h4>
+                            <button onclick="exportarReporteUtilidad()" class="btn secondary">📥 Exportar</button>
+                        </div>
+                        <div id="tablaReporteUtilidad" style="overflow-x:auto;">
+                            <table style="width:100%;border-collapse:collapse;">
+                                <thead>
+                                    <tr style="background:var(--surface-alt);">
+                                        <th style="padding:var(--spacing-md);text-align:left;">Producto</th>
+                                        <th style="padding:var(--spacing-md);text-align:right;">Costo</th>
+                                        <th style="padding:var(--spacing-md);text-align:right;">Precio Venta</th>
+                                        <th style="padding:var(--spacing-md);text-align:right;">Utilidad Unitaria</th>
+                                        <th style="padding:var(--spacing-md);text-align:right;">Unidades Vendidas</th>
+                                        <th style="padding:var(--spacing-md);text-align:right;">Utilidad Total</th>
+                                        <th style="padding:var(--spacing-md);text-align:right;">Margen %</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tbodyReporteUtilidad">
+                                    <tr><td colspan="7" style="padding:var(--spacing-md);text-align:center;">Cargando datos...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
 
-                <div class="chart-container" style="margin-top:24px;">
-                    <div class="chart-header">
-                        <h4 class="chart-title">Inventario Actual</h4>
-                        <button id="btnReporteInventario" class="btn secondary">Generar</button>
-                    </div>
-                    <div id="reporteInventario" class="list">
-                        <div class="item">Pulsa "Generar" para ver el inventario actual.</div>
+                <!-- Reporte: Inventario -->
+                <div id="reporte-inventario" class="reporte-section" style="display:none;">
+                    <div class="chart-container">
+                        <div class="chart-header">
+                            <h4 class="chart-title">Inventario Actual</h4>
+                            <button id="btnReporteInventario" class="btn secondary">🔄 Generar</button>
+                        </div>
+                        <div id="reporteInventario" class="list">
+                            <div class="item">Pulsa "Generar" para ver el inventario actual.</div>
+                        </div>
                     </div>
                 </div>
 
-                <div class="chart-container" style="margin-top:24px;">
-                    <div class="chart-header" style="gap:10px;display:flex;align-items:center;">
-                        <h4 class="chart-title">Reporte de Compras por Periodo</h4>
-                        <input type="date" id="comprasFechaInicio" class="input" style="width:auto;"/>
-                        <input type="date" id="comprasFechaFin" class="input" style="width:auto;"/>
-                        <button id="btnReporteCompras" class="btn secondary">Generar</button>
+                <!-- Reporte: Compras -->
+                <div id="reporte-compras" class="reporte-section" style="display:none;">
+                    <div class="chart-container">
+                        <div class="chart-header" style="gap:10px;display:flex;align-items:center;flex-wrap:wrap;">
+                            <h4 class="chart-title">Reporte de Compras por Periodo</h4>
+                            <input type="date" id="comprasFechaInicio" class="input" style="width:auto;"/>
+                            <span>a</span>
+                            <input type="date" id="comprasFechaFin" class="input" style="width:auto;"/>
+                            <button id="btnReporteCompras" class="btn secondary">🔄 Generar</button>
+                        </div>
+                        <div id="reporteCompras" class="list">
+                            <div class="item">Selecciona fechas (opcional) y pulsa "Generar".</div>
+                        </div>
                     </div>
-                    <div id="reporteCompras" class="list">
-                        <div class="item">Selecciona fechas (opcional) y pulsa "Generar".</div>
+                </div>
+
+                <!-- Reporte: Ventas -->
+                <div id="reporte-ventas" class="reporte-section" style="display:none;">
+                    <div class="chart-container">
+                        <div class="chart-header">
+                            <h4 class="chart-title">Listado de Ventas</h4>
+                        </div>
+                        <div class="list-search">
+                            <input id="buscarVenta" placeholder="Buscar ventas..." class="input" type="text">
+                        </div>
+                        <div id="reporteVentas" class="list">
+                            <div class="item">Cargando ventas recientes...</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Reporte: Clientes -->
+                <div id="reporte-clientes" class="reporte-section" style="display:none;">
+                    <div class="chart-container">
+                        <div class="chart-header">
+                            <h4 class="chart-title">Listado de Clientes</h4>
+                        </div>
+                        <div class="list-search">
+                            <input id="buscarCliente" placeholder="Buscar clientes..." class="input" type="text">
+                        </div>
+                        <div id="reporteClientes" class="list">
+                            <div class="item">Cargando lista de clientes...</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Reporte: Ventas por Temporada -->
+                <div id="reporte-temporada" class="reporte-section" style="display:none;">
+                    <div class="chart-container">
+                        <div class="chart-header">
+                            <h4 class="chart-title">Análisis de Ventas por Temporada</h4>
+                            <select id="selectTemporada" class="input" style="width:auto;">
+                                <option value="actual">Temporada Actual</option>
+                                <option value="anterior">Temporada Anterior</option>
+                                <option value="trimestre">Trimestre</option>
+                                <option value="anual">Año Actual</option>
+                            </select>
+                        </div>
+                        <div id="reporteTemporada" style="padding:20px;">
+                            <div class="chart-canvas" style="height:400px;position:relative;">
+                                <canvas id="temporadaChartReportes"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Reporte: Rotación de Inventario -->
+                <div id="reporte-rotacion" class="reporte-section" style="display:none;">
+                    <div class="chart-container">
+                        <div class="chart-header">
+                            <h4 class="chart-title">Rotación de Inventario</h4>
+                        </div>
+                        <div id="reporteRotacion" class="list">
+                            <div class="item">Cargando rotación de inventario...</div>
+                        </div>
                     </div>
                 </div>
             </div>

@@ -867,3 +867,193 @@ textarea:focus-visible {
   outline: 3px solid rgba(37, 99, 235, 0.3);
   outline-offset: 2px;
 }
+
+/* ==================== SUBMENÚ DE REPORTES ==================== */
+.sidebar-menu-item.has-submenu {
+  position: relative;
+}
+
+.submenu-arrow {
+  margin-left: auto;
+  font-size: 0.75rem;
+  transition: transform var(--transition-base);
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.sidebar-submenu {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  background: rgba(0, 0, 0, 0.2);
+  border-left: 3px solid var(--primary);
+  animation: slideDown 0.3s ease-out;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    max-height: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    max-height: 500px;
+    transform: translateY(0);
+  }
+}
+
+.sidebar-submenu .sidebar-menu-item {
+  margin: 0;
+}
+
+.sidebar-submenu .sidebar-menu-link {
+  padding-left: calc(var(--spacing-lg) + 20px);
+  font-size: var(--font-size-sm);
+  border-left: none;
+}
+
+.sidebar-submenu .sidebar-menu-link:hover {
+  background: rgba(37, 99, 235, 0.1);
+  border-left: 3px solid var(--primary-light);
+}
+
+.sidebar-submenu .sidebar-menu-link.active {
+  background: rgba(37, 99, 235, 0.2);
+  border-left: 3px solid var(--primary);
+}
+
+/* ==================== PESTAÑAS DE REPORTES ==================== */
+.reporte-tabs-container {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 12px;
+  scrollbar-width: thin;
+}
+
+.reporte-tabs-container::-webkit-scrollbar {
+  height: 6px;
+}
+
+.reporte-tabs-container::-webkit-scrollbar-thumb {
+  background: var(--text-light);
+  border-radius: 3px;
+}
+
+.reporte-tab {
+  padding: 12px 20px;
+  border: none;
+  background: var(--surface-alt);
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
+  cursor: pointer;
+  transition: all var(--transition-base);
+  white-space: nowrap;
+  border-bottom: 3px solid transparent;
+  position: relative;
+  font-family: var(--font-family);
+}
+
+.reporte-tab:hover {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+  transform: translateY(-2px);
+}
+
+.reporte-tab.active {
+  background: var(--surface);
+  color: var(--primary);
+  border-bottom-color: var(--primary);
+  box-shadow: 0 -2px 8px rgba(37, 99, 235, 0.1);
+}
+
+.reporte-tab.active::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--primary);
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
+}
+
+.reporte-section {
+  animation: fadeIn 0.3s ease-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Mejoras visuales para reportes */
+.chart-container {
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-lg);
+  box-shadow: var(--shadow-md);
+  margin-bottom: var(--spacing-lg);
+  border: 1px solid var(--surface-alt);
+}
+
+.chart-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--spacing-lg);
+  flex-wrap: wrap;
+  gap: var(--spacing-md);
+}
+
+.chart-title {
+  font-size: var(--font-size-lg);
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+/* Mejoras para tablas de reportes */
+.reporte-section table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: var(--spacing-md);
+}
+
+.reporte-section table thead {
+  background: var(--surface-alt);
+}
+
+.reporte-section table th {
+  padding: var(--spacing-md);
+  text-align: left;
+  font-weight: 600;
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-bottom: 2px solid var(--surface-alt);
+}
+
+.reporte-section table td {
+  padding: var(--spacing-md);
+  border-bottom: 1px solid var(--surface-alt);
+  color: var(--text-primary);
+}
+
+.reporte-section table tbody tr:hover {
+  background: var(--surface-alt);
+  transition: background var(--transition-fast);
+}
+
+.reporte-section table tbody tr:last-child td {
+  border-bottom: none;
+}

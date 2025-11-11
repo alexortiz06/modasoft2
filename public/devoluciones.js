@@ -39,42 +39,93 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 async function buscarVentasCliente() {
-    const cedula = document.getElementById('devolucionCedula').value.trim();
-    if (!cedula) {
-        alert('Ingrese la cédula del cliente');
+    const inputVenta = document.getElementById('devolucionNumeroVenta');
+    if (!inputVenta) {
+        console.error('No se encontró el campo devolucionNumeroVenta');
+        alert('Error: No se encontró el campo de número de venta');
+        return;
+    }
+    
+    const idVenta = inputVenta.value.trim();
+    if (!idVenta) {
+        alert('Ingrese el número de venta');
         return;
     }
 
+    const idVentaNum = parseInt(idVenta);
+    if (isNaN(idVentaNum) || idVentaNum <= 0) {
+        alert('El número de venta debe ser un número válido');
+        return;
+    }
+
+    const contenedor = document.getElementById('ventasClienteDevolucion');
+    if (!contenedor) {
+        console.error('No se encontró el contenedor ventasClienteDevolucion');
+        alert('Error: No se encontró el contenedor de resultados');
+        return;
+    }
+
+    // Mostrar mensaje de carga
+    contenedor.innerHTML = '<div class="item">Buscando venta...</div>';
+
     try {
-        const res = await fetch(`/api/devoluciones/ventas-cliente?cedula=${encodeURIComponent(cedula)}`);
+        const res = await fetch(`/api/devoluciones/venta?id_venta=${encodeURIComponent(idVentaNum)}`);
+        
+        if (!res.ok) {
+            throw new Error(`Error HTTP: ${res.status} ${res.statusText}`);
+        }
+        
         const data = await res.json();
-        const contenedor = document.getElementById('ventasClienteDevolucion');
+        console.log('Respuesta del servidor:', data);
+        
+        if (data.error) {
+            contenedor.innerHTML = `<div class="item" style="color:#b71c1c;">${data.error}</div>`;
+            return;
+        }
         
         if (data.ok && data.ventas && data.ventas.length > 0) {
-            contenedor.innerHTML = data.ventas.map(venta => `
+            contenedor.innerHTML = data.ventas.map(venta => {
+                const fechaVenta = new Date(venta.fecha_hora);
+                const ahora = new Date();
+                const horasTranscurridas = (ahora - fechaVenta) / (1000 * 60 * 60);
+                const horasRestantes = Math.max(0, 48 - horasTranscurridas);
+                const tiempoInfo = horasRestantes > 0 
+                    ? `<span style='color:#2e7d32;font-weight:600;'>Tiempo restante: ${Math.floor(horasRestantes)} horas</span>`
+                    : `<span style='color:#b71c1c;font-weight:600;'>Tiempo expirado</span>`;
+                
+                // Verificar que venta.detalles existe y es un array
+                const detalles = venta.detalles || [];
+                
+                return `
                 <div class="item">
                     <div>
                         <strong>Venta #${venta.id_venta}</strong><br>
                         Fecha: ${venta.fecha_hora}<br>
                         Total: $${venta.total_venta}<br>
+                        ${tiempoInfo}<br>
                         Productos:
                         <ul style="margin-top:8px;">
-                            ${venta.detalles.map(det => {
+                            ${detalles.length > 0 ? detalles.map(det => {
                                 const disponible = Number(det.disponible || 0);
                                 const badge = disponible > 0 ? `<span style='color:#2e7d32;font-weight:600;margin-left:6px;'>(Disp.: ${disponible})</span>` : `<span style='color:#b71c1c;font-weight:600;margin-left:6px;'>(Sin disp.)</span>`;
-                                const btn = disponible > 0 ? `<button class="btn btn-small" onclick="procesarDevolucion(${det.id_detalle}, ${disponible})" style="margin-left:10px;">Devolver</button>` : '';
-                                return `<li>${det.nombre_producto} - Talla: ${det.nombre_talla} - Cantidad vendida: ${det.cantidad} ${badge} - Precio neto: $${Number(det.precio_neto || det.precio_unitario).toFixed(2)} ${btn}</li>`;
-                            }).join('')}
+                                const btn = disponible > 0 && horasRestantes > 0 ? `<button class="btn btn-small" onclick="procesarDevolucion(${det.id_detalle}, ${disponible})" style="margin-left:10px;">Devolver</button>` : '';
+                                return `<li>${det.nombre_producto || 'Producto'} - Talla: ${det.nombre_talla || '-'} - Cantidad vendida: ${det.cantidad} ${badge} - Precio neto: $${Number(det.precio_neto || det.precio_unitario || 0).toFixed(2)} ${btn}</li>`;
+                            }).join('') : '<li>No hay detalles disponibles</li>'}
                         </ul>
                     </div>
                 </div>
-            `).join('');
+            `;
+            }).join('');
         } else {
-            contenedor.innerHTML = '<div class="item">No se encontraron ventas para este cliente</div>';
+            contenedor.innerHTML = '<div class="item">No se encontró la venta</div>';
         }
     } catch (error) {
-        console.error('Error:', error);
-        alert('Error al buscar ventas');
+        console.error('Error al buscar venta:', error);
+        const contenedor = document.getElementById('ventasClienteDevolucion');
+        if (contenedor) {
+            contenedor.innerHTML = `<div class="item" style="color:#b71c1c;">Error al buscar venta: ${error.message}</div>`;
+        }
+        alert('Error al buscar venta. Revisa la consola para más detalles.');
     }
 }
 

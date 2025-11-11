@@ -1,207 +1,215 @@
-/* ==================================== */
-/* 1. Variables Base y Reset */
-/* ==================================== */
+/* ----------------------------------------------------- */
+/* 1. VARIABLES Y RESET BÁSICO */
+/* ----------------------------------------------------- */
 :root {
-  --color-bg-dark: #0f162a; /* Fondo muy oscuro, casi negro-azulado */
-  --color-bg-card: rgba(30, 45, 70, 0.95); /* Fondo de tarjeta semitransparente azul oscuro */
-  --color-border-glow: #007bff; /* Azul vibrante para bordes y brillos */
-  --color-text-light: #e0f7fa; /* Texto claro */
-  --color-input-bg: rgba(255, 255, 255, 0.1); /* Fondo de input muy sutil */
-  --color-input-text: #ffffff; /* Texto dentro del input */
-  --color-primary-btn: linear-gradient(to top, #007bff, #00bfff); /* Gradiente para botón */
-  --color-status-ok: #4caf50; /* ¡El color verde para el estado! */
-  --font-family-base: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  --shadow-glow: 0 0 15px rgba(0, 123, 255, 0.6);
+  --color-modasoft-red: #0f172a; /* Rojo principal de la marca, como en tu imagen */
+  --color-bg-light: #FFFFFF; /* Fondo de la tarjeta */
+  --color-illustration-bg: #f8f8f8; /* Fondo sutil de la ilustración */
+  --color-text-dark: #333333;
+  --color-text-muted: #888888;
 }
 
-* {
-  box-sizing: border-box;
+body {
+  /* Familia tipográfica 'Inter' cargada en tu HTML */
+  font-family: 'Inter', sans-serif; 
   margin: 0;
-  padding: 0;
-}
-
-/* ==================================== */
-/* 2. Estilo de Pantalla Completa y Fondo */
-/* ==================================== */
-
-body, html{
-  height: 100%;
-  font-family: var(--font-family-base);
-  color: var(--color-text-light);
-  background-color: var(--color-bg-dark); /* Color de respaldo si la imagen falla */
-  
-  /* URL de una imagen pública de fondo tecnológico */
-  background-image: url('tech-background3.jpeg');
-  background-size: cover; /* Asegura que cubra toda la pantalla */
-  background-position: center; /* Centra la imagen */
-  background-repeat: no-repeat; /* Evita que se repita */
-  
+  min-height: 100vh;
   display: flex;
   justify-content: center;
-  align-items: center; 
-  overflow: hidden; 
+  align-items: center;
+  background-color: var(--color-modasoft-red); /* Fondo rojo del cuerpo */
+  padding: 20px;
+  box-sizing: border-box;
+  /* Evita el scrollbar si el contenido es más alto que la ventana */
+  overflow-y: hidden; 
 }
-/* El contenedor principal abarca el espacio y centra el contenido */
+
+
+/* ----------------------------------------------------- */
+/* 2. CONTENEDOR PRINCIPAL (La Tarjeta de Login) */
+/* ----------------------------------------------------- */
 .container {
-  width: 100%; 
-  max-width: 450px; /* Limita el ancho para un mejor posicionamiento del estado */
-  height: 100%; 
-  position: relative; /* Esencial para posicionar el header absoluto */
-  padding: 0;
+  display: flex; 
+  width: 900px; /* Ancho deseado para la tarjeta */
+  max-width: 95%;
+  height: 500px; /* Altura fija para el diseño */
+  max-height: 90vh;
+  background: var(--color-bg-light); 
+  border-radius: 20px;
+  box-shadow: 0 15px 30px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+}
+
+/* Ocultamos los elementos del HTML que no queremos mostrar en el login */
+.header,
+.status-msg,
+#loginMsg {
+  display: none !important; 
+}
+
+
+/* ----------------------------------------------------- */
+/* 3. PANEL DE ILUSTRACIÓN (Izquierda - Creado con pseudo-elemento) */
+/* ----------------------------------------------------- */
+.container::before {
+  content: '';
+  flex: 1.2; /* Ligeramente más grande que el formulario, si lo deseas (ej: 55%) */
+  background-color: var(--color-illustration-bg);
+  position: relative;
+  
+  /* Centrar la ilustración */
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  
+  /* Usamos la imagen de referencia como fondo */
+  /* NOTA: La ruta debe ser a tu imagen guardada (ej. 'imagen/modasoft_logo.png') */
+  background-image: url('imagenes2.png'); 
+  background-size: 95%; /* Ajusta el tamaño de la imagen dentro del panel */
+  background-repeat: no-repeat;
+  background-position: center center; 
+}
+
+
+/* ----------------------------------------------------- */
+/* 4. PANEL DE FORMULARIO (Derecha - <main class="card">) */
+/* ----------------------------------------------------- */
+main.card {
+  flex: 1; /* Ocupa el espacio restante */
+  background: var(--color-bg-light);
+  padding: 40px;
+  border-radius: 0;
+  box-shadow: none; 
   display: flex;
   flex-direction: column;
-  justify-content: center; 
-  align-items: center;
+  justify-content: center; /* Centra verticalmente el contenido */
 }
 
-/* ==================================== */
-/* 3. Header y Estado (Lo Verde) */
-/* ==================================== */
-
-.header {
-  /* Posicionamiento del estado en la esquina superior derecha, fuera de la tarjeta */
-  position: absolute; 
-  top: 20px; 
-  right: 20px;
-  width: auto;
-  padding: 0;
-  margin: 0;
-}
-
-/* Ocultamos el título H1 "ERP simple - Modasoft" */
-.header h1 {
-  display: none; 
-}
-
-/* Estilo del indicador de estado (el elemento que tiene lo verde) */
-#statusDisplay {
-  font-size: 0.8em;
-  padding: 5px 10px;
-  border: 1px solid var(--color-status-ok); 
-  color: var(--color-status-ok); /* ¡Aplica el color verde al texto! */
-  border-radius: 4px;
-  background-color: rgba(76, 175, 80, 0.1); /* Fondo verde muy sutil */
-  display: block;
-  white-space: nowrap; /* Para que no se rompa la línea */
-}
-
-/* ==================================== */
-/* 4. Tarjeta de Login (Card) */
-/* ==================================== */
-
-.card {
-  background: var(--color-bg-card);
-  border: 1px solid rgba(0, 123, 255, 0.3);
-  border-radius: 20px;
-  
-  /* MODIFICACIÓN: Reducimos el padding vertical de 40px a 25px */
-  padding: 1px 40px; 
-  
+/* Contenedor del formulario */
+#loginSection {
   width: 100%;
-  max-width: 380px; 
-  box-shadow: var(--shadow-glow);
-  backdrop-filter: blur(5px);
-  animation: fadeIn 1s ease-out;
+  max-width: 320px; 
+  margin: 0 auto;
 }
 
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(-20px); }
-  to { opacity: 1; transform: translateY(0); }
+#loginSection h2 {
+  text-align: left;
+  color: var(--color-text-dark);
+  font-size: 2.2em;
+  font-weight: 700;
+  margin-bottom: 30px;
+  /* Cambiamos el texto "Acceso al Sistema" por "SIGN IN" para que coincida con la imagen */
+  content: 'SIGN IN'; 
+  text-transform: uppercase;
 }
 
-.section {
-  text-align: center;
-}
-
-/* Implementación del "MODASOFT" encima del título */
-.card::before {
-  content: "MODASOFT"; 
-  display: block;
-  font-size: 1.2em;
-  font-weight: bold;
-  color: var(--color-border-glow);
-  margin-bottom: 10px;
-  text-shadow: var(--shadow-glow);
-}
-
-.section h2 {
-  font-size: 1.8em;
-  margin-bottom: 25px;
-  letter-spacing: 1.5px;
-  color: var(--color-text-light);
-  text-shadow: 0 0 5px rgba(0, 123, 255, 0.4);
-}
-
-/* ==================================== */
-/* 5. Inputs y Botón */
-/* ==================================== */
-
+/* ----------------------------------------------------- */
+/* 5. ESTILOS DE FORMULARIO */
+/* ----------------------------------------------------- */
 .field {
   margin-bottom: 20px;
-  text-align: left;
+  position: relative;
 }
 
 .field label {
-  display: block;
-  margin-bottom: 5px;
-  font-size: 0.9em;
-  color: rgba(255, 255, 255, 0.7);
+  /* Ocultamos el label y usamos solo el placeholder para el look limpio */
+  display: none; 
 }
 
 .field input[type="text"],
 .field input[type="password"] {
   width: 100%;
-  padding: 12px 15px;
-  border: 1px solid rgba(0, 123, 255, 0.2);
-  border-radius: 8px;
-  background-color: var(--color-input-bg);
-  color: var(--color-input-text);
+  padding: 12px 10px;
+  border: none; /* Quitamos el borde */
+  border-bottom: 1px solid #ddd; /* Solo un borde inferior suave */
+  border-radius: 0;
   font-size: 1em;
-  outline: none;
-  transition: border-color 0.3s, box-shadow 0.3s;
+  box-sizing: border-box;
+  transition: border-color 0.3s ease;
+  background: transparent; /* Fondo transparente */
 }
 
 .field input:focus {
-  border-color: var(--color-border-glow);
-  box-shadow: 0 0 8px rgba(0, 123, 255, 0.5);
-  background-color: rgba(255, 255, 255, 0.15);
+  border-color: var(--color-modasoft-red);
+  outline: none;
 }
 
-.field input::placeholder {
-  color: rgba(255, 255, 255, 0.4);
+/* Puedes añadir iconos si quieres, como en la imagen, usando un pseudo-elemento en .field */
+/* Nota: Necesitarías una librería de iconos o usar SVG/imágenes */
+.field::before {
+  /* Esto es solo un placeholder para los iconos */
+  font-family: FontAwesome; /* Necesitas la librería FontAwesome en tu HTML */
+  position: absolute;
+  left: -20px; /* Ajusta la posición del icono */
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--color-text-muted);
+  font-size: 1.1em;
+  /* content: '\f007'; /* Icono de usuario de FontAwesome */ 
 }
 
-.btn {
+/* Estilo del botón principal (Entrar -> LOGIN) */
+.btn.primary {
   width: 100%;
   padding: 12px;
-  margin-top: 15px;
+  background-color: var(--color-modasoft-red);
+  color: white;
   border: none;
-  border-radius: 8px;
+  border-radius: 20px; /* Botón con bordes redondeados como en la imagen */
   font-size: 1.1em;
-  font-weight: bold;
+  font-weight: 600;
   cursor: pointer;
-  transition: transform 0.2s, box-shadow 0.3s;
+  transition: background-color 0.3s ease;
+  margin-top: 30px;
   text-transform: uppercase;
 }
 
-.btn.primary {
-  background: var(--color-primary-btn);
-  color: #ffffff;
-  box-shadow: 0 4px 15px rgba(0, 123, 255, 0.5);
-}
-
 .btn.primary:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(0, 123, 255, 0.8);
+  background-color: #cc0a30;
 }
 
-.btn.primary:active {
-  transform: translateY(0);
-  box-shadow: 0 2px 10px rgba(0, 123, 255, 0.5);
+/* Estilo para el enlace de "Forgot Password" (simulado) */
+.forgot-password {
+  display: block;
+  text-align: center;
+  margin-top: 15px;
+  color: var(--color-text-muted);
+  text-decoration: none;
+  font-size: 0.9em;
+  transition: color 0.3s ease;
 }
 
-.msg {
-  margin-top: 25px;
-  font-size: 0.85em;
-  color: rgba(255, 255, 255, 0.6);
+.forgot-password:hover {
+  color: var(--color-modasoft-red);
+}
+
+/* ----------------------------------------------------- */
+/* 6. RESPONSIVIDAD */
+/* ----------------------------------------------------- */
+@media (max-width: 900px) {
+  .container {
+      flex-direction: column; /* Apila los elementos en móvil */
+      width: 100%;
+      height: auto;
+      max-width: 400px;
+      border-radius: 10px;
+  }
+
+  .container::before {
+      order: -1; /* Mueve la ilustración arriba */
+      height: 200px; /* Altura de la imagen en móvil */
+      background-size: contain; /* Asegura que la imagen quepa */
+      border-top-left-radius: 10px;
+      border-top-right-radius: 10px;
+      border-bottom-left-radius: 0;
+  }
+
+  main.card {
+      padding: 30px 20px;
+  }
+
+  #loginSection h2 {
+      font-size: 1.8em;
+      text-align: center;
+  }
 }

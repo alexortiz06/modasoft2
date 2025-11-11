@@ -30,6 +30,12 @@ document.addEventListener('DOMContentLoaded', function() {
         cargarProveedoresCompra();
         cargarProductosCompra();
         
+        // Cargar tallas cuando se seleccione un producto
+        const compraProductoSelect = document.getElementById('compraProducto');
+        if (compraProductoSelect) {
+            compraProductoSelect.addEventListener('change', cargarTallasProductoCompra);
+        }
+        
         document.getElementById('btnAgregarItemCompra')?.addEventListener('click', agregarItemCompra);
         document.getElementById('form-compra')?.addEventListener('submit', registrarCompra);
     }
@@ -154,9 +160,63 @@ async function cargarProductosCompra() {
     }
 }
 
+async function cargarTallasProductoCompra() {
+    const idProducto = document.getElementById('compraProducto').value;
+    const selectTalla = document.getElementById('compraTalla');
+    
+    if (!selectTalla) return;
+    
+    if (!idProducto) {
+        selectTalla.innerHTML = '<option value="">Selecciona Talla</option>';
+        return;
+    }
+    
+    try {
+        // Cargar todas las tallas disponibles y las tallas del producto en paralelo
+        const [resTallas, resProducto] = await Promise.all([
+            fetch('/api/tallas'),
+            fetch(`/api/admin/productos/${idProducto}`)
+        ]);
+        
+        const dataTallas = await resTallas.json();
+        const dataProducto = await resProducto.json();
+        
+        // Crear un mapa de tallas del producto con su stock
+        const tallasProductoMap = {};
+        if (dataProducto.producto && dataProducto.producto.tallas) {
+            dataProducto.producto.tallas.forEach(talla => {
+                tallasProductoMap[talla.id_talla] = talla.cantidad;
+            });
+        }
+        
+        // Mostrar TODAS las tallas disponibles
+        if (dataTallas.tallas && dataTallas.tallas.length > 0) {
+            selectTalla.innerHTML = '<option value="">Selecciona Talla</option>';
+            dataTallas.tallas.forEach(talla => {
+                const opt = document.createElement('option');
+                opt.value = talla.id_talla;
+                // Si el producto tiene esta talla, mostrar stock; si no, indicar que es nueva
+                if (tallasProductoMap.hasOwnProperty(talla.id_talla)) {
+                    opt.textContent = `${talla.nombre} (Stock: ${tallasProductoMap[talla.id_talla]})`;
+                } else {
+                    opt.textContent = `${talla.nombre} (Nueva - se creará en inventario)`;
+                }
+                selectTalla.appendChild(opt);
+            });
+        } else {
+            selectTalla.innerHTML = '<option value="">No hay tallas disponibles</option>';
+        }
+    } catch (error) {
+        console.error('Error cargando tallas:', error);
+        selectTalla.innerHTML = '<option value="">Error al cargar tallas</option>';
+    }
+}
+
 function agregarItemCompra() {
     const idProducto = document.getElementById('compraProducto').value;
-    const idTalla = document.getElementById('compraTalla') ? document.getElementById('compraTalla').value : '';
+    const selectTalla = document.getElementById('compraTalla');
+    const idTalla = selectTalla ? selectTalla.value : '';
+    const nombreTalla = selectTalla && selectTalla.selectedIndex > 0 ? selectTalla.options[selectTalla.selectedIndex].textContent.split(' ')[0] : '';
     const cantidad = parseInt(document.getElementById('compraCantidad').value);
     const costo = parseFloat(document.getElementById('compraCosto').value);
 
@@ -166,7 +226,7 @@ function agregarItemCompra() {
         return;
     }
 
-    itemsCompra.push({ idProducto, idTalla: idTalla || null, cantidad, costo });
+    itemsCompra.push({ idProducto, idTalla: idTalla || null, nombreTalla, cantidad, costo });
     renderItemsCompra();
     calcularTotalCompra();
     // Limpiar campos
@@ -182,7 +242,7 @@ function renderItemsCompra() {
         return;
     }
     contenedor.innerHTML = itemsCompra.map((item, idx) => {
-        const tallaTxt = item.idTalla && item.idTalla !== 'null' && item.idTalla !== '' ? `- Talla ${item.idTalla}` : '';
+        const tallaTxt = item.idTalla && item.idTalla !== 'null' && item.idTalla !== '' ? `- Talla ${item.nombreTalla || item.idTalla}` : '- Sin talla';
         return `
         <div class="item">
             <span>Producto ${item.idProducto} ${tallaTxt} - ${item.cantidad} unidades - $${item.costo.toFixed(2)} c/u</span>
@@ -287,6 +347,67 @@ async function cargarCompras() {
 }
 
 // ==================== FUNCIONES DE CLIENTES ====================
+async function cargarClientes(busqueda = '') {
+    const cont = document.getElementById('reporteClientes');
+    if (!cont) {
+        // Si no existe el contenedor de reportes, usar el de clientes normal
+        const lista = document.getElementById('listaClientes');
+        if (!lista) return;
+        cont = lista;
+    }
+    
+    try {
+        const res = await fetch('/api/clientes');
+        const data = await res.json();
+        if (!data || !data.clientes || data.clientes.length === 0) {
+            cont.innerHTML = '<div class="item">No hay clientes registrados.</div>';
+            return;
+        }
+        
+        let clientes = data.clientes;
+        if (busqueda) {
+            const b = busqueda.toLowerCase();
+            clientes = clientes.filter(c => 
+                (c.nombre || '').toLowerCase().includes(b) ||
+                (c.cedula || '').includes(b) ||
+                (c.telefono || '').includes(b) ||
+                (c.email || '').toLowerCase().includes(b)
+            );
+        }
+        
+        if (clientes.length === 0) {
+            cont.innerHTML = '<div class="item">No se encontraron clientes.</div>';
+            return;
+        }
+        
+        let html = `<table style="width:100%;border-collapse:collapse;">
+            <thead>
+                <tr style="background:var(--surface-alt);">
+                    <th style="padding:var(--spacing-md);text-align:left;">Nombre</th>
+                    <th style="padding:var(--spacing-md);text-align:left;">Cédula</th>
+                    <th style="padding:var(--spacing-md);text-align:left;">Teléfono</th>
+                    <th style="padding:var(--spacing-md);text-align:left;">Email</th>
+                </tr>
+            </thead>
+            <tbody>`;
+        clientes.forEach(c => {
+            html += `<tr>
+                <td style="padding:var(--spacing-md);">${c.nombre || 'N/A'}</td>
+                <td style="padding:var(--spacing-md);">${c.cedula || 'N/A'}</td>
+                <td style="padding:var(--spacing-md);">${c.telefono || 'N/A'}</td>
+                <td style="padding:var(--spacing-md);">${c.email || 'N/A'}</td>
+            </tr>`;
+        });
+        html += `</tbody></table>`;
+        cont.innerHTML = html;
+    } catch (e) {
+        console.error('Error cargando clientes:', e);
+        if (cont) {
+            cont.innerHTML = '<div class="item">Error al cargar clientes.</div>';
+        }
+    }
+}
+
 async function registrarCliente(e) {
     e.preventDefault();
     try {
@@ -631,6 +752,10 @@ async function cargarIngresos() {
 
 // ==================== FUNCIONES DE VENTAS (ADMIN) ====================
 async function cargarVentasAdmin(busqueda = '') {
+    const cont = document.getElementById('reporteVentas');
+    const lista = cont || document.getElementById('listaVentasAdmin');
+    if (!lista) return;
+    
     try {
         // Por ahora tomamos mes/año actuales; se pueden exponer filtros en UI
         const now = new Date();
@@ -638,8 +763,6 @@ async function cargarVentasAdmin(busqueda = '') {
         const month = now.getMonth() + 1;
         const res = await fetch(`/api/admin/ventas?year=${year}&month=${month}`);
         const data = await res.json();
-        const lista = document.getElementById('listaVentasAdmin');
-        if (!lista) return;
 
         if (!data.ok) {
             lista.innerHTML = `<div class="item">Error cargando ventas: ${data.message || 'error'}</div>`;
@@ -657,7 +780,15 @@ async function cargarVentasAdmin(busqueda = '') {
             return;
         }
 
-        lista.innerHTML = ventas.map(v => `
+        // Usar el nuevo endpoint que incluye totales por tipo de pago
+        const resDetalle = await fetch(`/api/reportes/ventas-detalle?year=${year}&month=${month}`);
+        const dataDetalle = await resDetalle.json();
+        
+        if (dataDetalle.ok && dataDetalle.ventas) {
+            ventas = dataDetalle.ventas;
+        }
+        
+        let html = ventas.map(v => `
             <div class="item" data-id="${v.id_venta}">
                 <div>
                     <strong>Venta #${v.id_venta}</strong> — ${v.cliente || 'Cliente Anónimo'}<br>
@@ -670,10 +801,30 @@ async function cargarVentasAdmin(busqueda = '') {
                 </div>
             </div>
         `).join('');
+        
+        // Agregar totales por tipo de pago al final
+        if (dataDetalle.ok && dataDetalle.totales) {
+            const totales = dataDetalle.totales;
+            html += `
+                <div class="item" style="background:var(--surface-alt);padding:16px;margin-top:16px;border-radius:8px;">
+                    <strong style="font-size:1.1em;">📊 Resumen de Pagos</strong><br>
+                    <div style="margin-top:12px;display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;">
+                        <div><strong>Total General:</strong> $${parseFloat(totales.total || 0).toFixed(2)}</div>
+                        <div><strong>Efectivo:</strong> $${parseFloat(totales.efectivo || 0).toFixed(2)}</div>
+                        <div><strong>Pago Móvil:</strong> $${parseFloat(totales.pago_movil || 0).toFixed(2)}</div>
+                        <div><strong>Transferencia:</strong> $${parseFloat(totales.transferencia || 0).toFixed(2)}</div>
+                        <div><strong>Tarjeta:</strong> $${parseFloat(totales.tarjeta || 0).toFixed(2)}</div>
+                    </div>
+                </div>
+            `;
+        }
+
+        lista.innerHTML = html;
 
         // Mostrar totales resumidos (si existe contenedor en dashboard)
         if (document.getElementById('ventasMes')) {
-            document.getElementById('ventasMes').textContent = '$' + (data.totales && data.totales.total_mes ? parseFloat(data.totales.total_mes).toFixed(2) : '0.00');
+            const total = dataDetalle.ok && dataDetalle.totales ? dataDetalle.totales.total : (data.totales && data.totales.total_mes ? data.totales.total_mes : 0);
+            document.getElementById('ventasMes').textContent = '$' + parseFloat(total).toFixed(2);
         }
 
     } catch (error) {
@@ -744,6 +895,39 @@ window.eliminarVentaAdmin = async function(id) {
     }
 };
 
+// ==================== FUNCIONES DE CLIENTES ====================
+async function cargarClientes(busqueda = '') {
+    const lista = document.getElementById('reporteClientes');
+    if (!lista) return;
+    
+    try {
+        const url = '/api/admin/clientes' + (busqueda ? `?busqueda=${encodeURIComponent(busqueda)}` : '');
+        const res = await fetch(url);
+        const data = await res.json();
+        
+        if (!data.ok || !data.clientes || data.clientes.length === 0) {
+            lista.innerHTML = '<div class="item">No hay clientes registrados.</div>';
+            return;
+        }
+        
+        lista.innerHTML = data.clientes.map(cliente => `
+            <div class="item">
+                <div>
+                    <strong>${cliente.nombre}</strong><br>
+                    <strong>Cédula:</strong> ${cliente.cedula}<br>
+                    <strong>Teléfono:</strong> ${cliente.telefono}<br>
+                    <strong>Email:</strong> ${cliente.email}<br>
+                    <strong>Total Ventas:</strong> ${cliente.total_ventas}<br>
+                    <strong>Total Compras:</strong> $${parseFloat(cliente.total_compras || 0).toFixed(2)}
+                </div>
+            </div>
+        `).join('');
+    } catch (error) {
+        console.error('Error cargando clientes:', error);
+        lista.innerHTML = '<div class="item">Error al cargar clientes.</div>';
+    }
+}
+
 
 // ==================== FUNCIONES DE CUENTAS POR PAGAR ====================
 async function cargarCuentasPagar() {
@@ -751,47 +935,133 @@ async function cargarCuentasPagar() {
         const res = await fetch('/api/cuentas-pagar');
         const data = await res.json();
         const lista = document.getElementById('listaCuentasPagar');
-        if (lista && data.cuentas) {
+        if (!lista) return;
+        
+        if (!data.ok || !data.cuentas || data.cuentas.length === 0) {
+            lista.innerHTML = '<div class="item">No hay cuentas por pagar pendientes.</div>';
+            return;
+        }
+        
             lista.innerHTML = data.cuentas.map(cuenta => `
                 <div class="item">
                     <div>
-                        <strong>Cuenta #${cuenta.id_cuenta}</strong><br>
-                        Proveedor: ${cuenta.nombre_proveedor} | 
-                        Monto: $${cuenta.monto_total} | 
-                        Pendiente: $${cuenta.monto_pendiente} | 
-                        Vencimiento: ${cuenta.fecha_vencimiento} | 
-                        Estado: ${cuenta.estado}
+                    <strong>Compra #${cuenta.id_compra} - ${cuenta.nombre_proveedor}</strong><br>
+                    <div style="margin-top:8px;">
+                        <strong>Monto Total:</strong> $${parseFloat(cuenta.monto_total).toFixed(2)} USD / ${parseFloat(cuenta.monto_total_bs).toFixed(2)} BS<br>
+                        <strong>Monto Pagado:</strong> $${parseFloat(cuenta.monto_pagado).toFixed(2)} USD<br>
+                        <strong>Monto Pendiente:</strong> $${parseFloat(cuenta.monto_pendiente).toFixed(2)} USD / ${parseFloat(cuenta.monto_pendiente_bs).toFixed(2)} BS<br>
+                        <strong>Porcentaje Pendiente:</strong> ${cuenta.porcentaje_pendiente}%<br>
+                        <strong>Fecha Compra:</strong> ${cuenta.fecha_compra}<br>
+                        <strong>Fecha Vencimiento:</strong> ${cuenta.fecha_vencimiento}<br>
+                        <strong>Estado:</strong> ${cuenta.estado}<br>
+                        <small style="color:#666;">Tasa Dólar: ${cuenta.tasa_dolar} BS/USD</small>
+                    </div>
                     </div>
                     <div class="actions">
-                        <button class="btn btn-small" onclick="registrarPago(${cuenta.id_cuenta})">Registrar Pago</button>
+                    <button class="btn btn-small" onclick="abrirModalRegistrarPago(${cuenta.id_compra}, ${cuenta.monto_pendiente}, ${cuenta.monto_total})">Registrar Pago</button>
                     </div>
                 </div>
             `).join('');
-        }
     } catch (error) {
         console.error('Error cargando cuentas por pagar:', error);
+        const lista = document.getElementById('listaCuentasPagar');
+        if (lista) {
+            lista.innerHTML = '<div class="item">Error al cargar cuentas por pagar.</div>';
+        }
     }
 }
+
+// Función para abrir modal de registro de pago
+function abrirModalRegistrarPago(idCompra, montoPendiente, montoTotal) {
+    document.getElementById('pagoIdCompra').value = idCompra;
+    const montoPendienteEl = document.getElementById('pagoMontoPendiente');
+    montoPendienteEl.textContent = parseFloat(montoPendiente || 0).toFixed(2);
+    montoPendienteEl.dataset.montoTotal = montoTotal;
+    document.getElementById('pagoMonto').value = '';
+    document.getElementById('pagoMonto').max = montoPendiente;
+    document.getElementById('pagoMonto').min = 0.01;
+    document.getElementById('pagoEstado').value = 'PARCIAL';
+    document.getElementById('pagoMetodo').value = 'EFECTIVO';
+    document.getElementById('pagoReferencia').value = '';
+    document.getElementById('pagoNotas').value = '';
+    toggleMontoPago();
+    mostrarModal('modalRegistrarPago');
+}
+
+// Función para toggle del campo de monto según el estado
+function toggleMontoPago() {
+    const estado = document.getElementById('pagoEstado').value;
+    const montoInput = document.getElementById('pagoMonto');
+    const montoPendiente = parseFloat(document.getElementById('pagoMontoPendiente').textContent || 0);
+    
+    if (estado === 'PAGADA') {
+        // Si es pago completo, establecer el monto pendiente automáticamente
+        montoInput.value = montoPendiente.toFixed(2);
+        montoInput.readOnly = true;
+        calcularMontoRestante();
+    } else {
+        // Si es parcial, permitir editar el monto
+        montoInput.readOnly = false;
+        montoInput.value = '';
+        montoInput.max = montoPendiente;
+        calcularMontoRestante();
+    }
+}
+
+// Función para calcular cuánto quedará debiendo
+function calcularMontoRestante() {
+    const montoPendiente = parseFloat(document.getElementById('pagoMontoPendiente').textContent || 0);
+    const montoPagado = parseFloat(document.getElementById('pagoMonto').value || 0);
+    const montoRestante = Math.max(0, montoPendiente - montoPagado);
+    
+    const restanteEl = document.getElementById('pagoMontoRestante');
+    if (restanteEl) {
+        restanteEl.textContent = montoRestante.toFixed(2);
+        if (montoRestante === 0) {
+            restanteEl.style.color = 'var(--success)';
+            restanteEl.textContent += ' (Pago completo)';
+        } else {
+            restanteEl.style.color = 'var(--error)';
+        }
+    }
+}
+
+// Función para registrar pago
+window.registrarPago = async function() {
+    // Esta función se llama desde el botón, pero el submit se maneja en el listener
+};
 
 // ==================== FUNCIONES DE CONTROL DE CAJA ====================
 async function cargarMovimientosCaja() {
     try {
-        const res = await fetch('/api/movimientos-caja');
+        const res = await fetch('/api/caja/movimientos');
         const data = await res.json();
         const lista = document.getElementById('listaMovimientosCaja');
-        if (lista && data.movimientos) {
+        if (!lista) return;
+        
+        if (!data.ok || !data.movimientos || data.movimientos.length === 0) {
+            lista.innerHTML = '<div class="item">No hay movimientos de caja registrados.</div>';
+            return;
+        }
+        
             lista.innerHTML = data.movimientos.map(mov => `
                 <div class="item">
                     <div>
-                        <strong>${mov.tipo_movimiento}</strong><br>
-                        Fecha: ${mov.fecha_hora} | Monto: $${mov.monto} | 
-                        ${mov.descripcion || ''}
+                    <strong>${mov.tipo || 'Movimiento'}</strong><br>
+                    <strong>Monto:</strong> $${parseFloat(mov.monto || 0).toFixed(2)}<br>
+                    <strong>Descripción:</strong> ${mov.descripcion || 'Sin descripción'}<br>
+                    <strong>Fecha:</strong> ${mov.fecha_hora || 'N/A'}<br>
+                    <strong>Usuario:</strong> ${mov.nombre_usuario || 'N/A'}<br>
+                    ${mov.referencia ? `<strong>Referencia:</strong> ${mov.referencia}<br>` : ''}
                     </div>
                 </div>
             `).join('');
-        }
     } catch (error) {
-        console.error('Error cargando movimientos:', error);
+        console.error('Error cargando movimientos de caja:', error);
+        const lista = document.getElementById('listaMovimientosCaja');
+        if (lista) {
+            lista.innerHTML = '<div class="item">Error al cargar movimientos de caja.</div>';
+        }
     }
 }
 
@@ -799,13 +1069,14 @@ async function cargarMovimientosCaja() {
 async function registrarConciliacion(e) {
     e.preventDefault();
     try {
-        const res = await fetch('/api/conciliacion', {
+        const res = await fetch('/api/conciliaciones', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 fecha_conciliacion: document.getElementById('conciliacionFecha').value,
-                saldo_libro: parseFloat(document.getElementById('conciliacionSaldoLibro').value),
-                saldo_banco: parseFloat(document.getElementById('conciliacionSaldoBanco').value)
+                saldo_libro: document.getElementById('conciliacionSaldoLibro').value,
+                saldo_banco: document.getElementById('conciliacionSaldoBanco').value,
+                notas: document.getElementById('conciliacionNotas').value
             })
         });
 
@@ -824,22 +1095,36 @@ async function registrarConciliacion(e) {
 
 async function cargarConciliaciones() {
     try {
-        const res = await fetch('/api/conciliacion');
+        const res = await fetch('/api/conciliaciones');
         const data = await res.json();
         const lista = document.getElementById('listaConciliaciones');
-        if (lista && data.conciliaciones) {
+        if (!lista) return;
+        
+        if (!data.ok || !data.conciliaciones || data.conciliaciones.length === 0) {
+            lista.innerHTML = '<div class="item">No hay conciliaciones registradas.</div>';
+            return;
+        }
+        
             lista.innerHTML = data.conciliaciones.map(conc => `
                 <div class="item">
                     <div>
-                        <strong>Conciliación ${conc.fecha_conciliacion}</strong><br>
-                        Saldo Libro: $${conc.saldo_libro} | Saldo Banco: $${conc.saldo_banco} | 
-                        Diferencia: $${conc.diferencia} | Estado: ${conc.estado}
+                    <strong>Conciliación #${conc.id_conciliacion}</strong><br>
+                    <strong>Fecha:</strong> ${conc.fecha_conciliacion}<br>
+                    <strong>Saldo Libro:</strong> $${parseFloat(conc.saldo_libro || 0).toFixed(2)}<br>
+                    <strong>Saldo Banco:</strong> $${parseFloat(conc.saldo_banco || 0).toFixed(2)}<br>
+                    <strong>Diferencia:</strong> $${parseFloat(conc.diferencia || 0).toFixed(2)}<br>
+                    <strong>Estado:</strong> ${conc.estado || 'N/A'}<br>
+                    ${conc.notas ? `<strong>Notas:</strong> ${conc.notas}<br>` : ''}
+                    <small style="color:#666;">Registrado: ${conc.fecha_registro || 'N/A'}</small>
                     </div>
                 </div>
             `).join('');
-        }
     } catch (error) {
         console.error('Error cargando conciliaciones:', error);
+        const lista = document.getElementById('listaConciliaciones');
+        if (lista) {
+            lista.innerHTML = '<div class="item">Error al cargar conciliaciones.</div>';
+        }
     }
 }
 
@@ -858,7 +1143,7 @@ async function cargarReporteUtilidad() {
                     <td style="padding:var(--spacing-md);text-align:right;">$${parseFloat(prod.utilidad_unitaria || 0).toFixed(2)}</td>
                     <td style="padding:var(--spacing-md);text-align:right;">${prod.unidades_vendidas || 0}</td>
                     <td style="padding:var(--spacing-md);text-align:right;">$${parseFloat(prod.utilidad_total || 0).toFixed(2)}</td>
-                    <td style="padding:var(--spacing-md);text-align:right;">${parseFloat(prod.margen_ganancia || 0).toFixed(1)}%</td>
+                    <td style="padding:var(--spacing-md);text-align:right;">${parseFloat(prod.margen_porcentaje || 0).toFixed(1)}%</td>
                 </tr>
             `).join('');
         }
@@ -962,48 +1247,528 @@ async function renderReporteCompras() {
 
 // ------------------ Análisis de Ventas por Temporada (frontend helper) ------------------
 async function fetchVentasTemporada(periodo = 'actual') {
-    try {
-        const res = await fetch(`/api/reportes/ventas-temporada?periodo=${encodeURIComponent(periodo)}`);
-        const data = await res.json();
-        if (!data) return;
-
-        // data.rows contiene objetos con ingreso_total (según la vista)
-        // Para compatibilidad con cargarGraficoVentas (que espera {ingreso_total}), pasamos rows directamente
-        if (data.rows && Array.isArray(data.rows)) {
-            // Si la vista devuelve por mes, usamos ingreso_total; si son agrupaciones, también deberían tener ingreso_total
-            cargarGraficoVentas(data.rows.map(r => ({ ingreso_total: Number(r.ingreso_total || 0), label: r.periodo || (r.anio && r.mes ? `${r.anio}-${String(r.mes).padStart(2,'0')}` : '') })));
+    // Buscar canvas en dashboard o en reportes
+    let canvas = document.getElementById('temporadaChart');
+    if (!canvas) {
+        canvas = document.getElementById('temporadaChartReportes');
+    }
+    const cont = document.getElementById('reporteTemporada');
+    
+    if (!canvas) {
+        console.log('Canvas temporadaChart no encontrado');
+        if (cont) {
+            cont.innerHTML = '<div class="item">Error: Canvas no encontrado</div>';
         }
+        return;
+    }
+    
+    try {
+        // Mapear periodo a formato correcto
+        let periodoQuery = periodo;
+        if (periodo === 'actual') {
+            periodoQuery = 'actual';
+        } else if (periodo === 'anterior') {
+            periodoQuery = 'anterior';
+        }
+        
+        const res = await fetch(`/api/reportes/ventas-temporada?periodo=${encodeURIComponent(periodoQuery)}`);
+        const data = await res.json();
+        if (!data || !data.rows || data.rows.length === 0) {
+            if (cont) {
+                cont.innerHTML = '<div class="item">No hay datos de ventas por temporada.</div>';
+            }
+            console.log('No hay datos de ventas por temporada');
+            return;
+        }
+
+        // Crear gráfico con Chart.js
+        if (canvas && typeof Chart !== 'undefined') {
+            const ctx = canvas.getContext('2d');
+            const labels = data.rows.map(r => r.periodo || (r.anio && r.mes ? `${r.anio}-${String(r.mes).padStart(2,'0')}` : 'N/A'));
+            const ingresos = data.rows.map(r => Number(r.ingreso_total || 0));
+            const unidades = data.rows.map(r => Number(r.unidades_vendidas || 0));
+            
+            // Destruir gráfico anterior si existe
+            if (window.temporadaChartInstance) {
+                window.temporadaChartInstance.destroy();
+            }
+            
+            window.temporadaChartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'Ingresos ($)',
+                            data: ingresos,
+                            borderColor: 'rgb(37, 99, 235)',
+                            backgroundColor: 'rgba(37, 99, 235, 0.1)',
+                            yAxisID: 'y',
+                            tension: 0.4
+                        },
+                        {
+                            label: 'Unidades Vendidas',
+                            data: unidades,
+                            borderColor: 'rgb(16, 185, 129)',
+                            backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                            yAxisID: 'y1',
+                            tension: 0.4
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: {
+                        mode: 'index',
+                        intersect: false,
+                    },
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top'
+                        },
+                        title: {
+                            display: true,
+                            text: 'Análisis de Ventas por Temporada',
+                            font: {
+                                size: 16,
+                                weight: 'bold'
+                            }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    if (context.datasetIndex === 0) {
+                                        return 'Ingresos: $' + context.parsed.y.toFixed(2);
+                                    } else {
+                                        return 'Unidades: ' + context.parsed.y;
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            type: 'linear',
+                            display: true,
+                            position: 'left',
+                            beginAtZero: true,
+                            ticks: {
+                                callback: function(value) {
+                                    return '$' + value.toFixed(2);
+                                }
+                            },
+                            title: {
+                                display: true,
+                                text: 'Ingresos ($)'
+                            }
+                        },
+                        y1: {
+                            type: 'linear',
+                            display: true,
+                            position: 'right',
+                            beginAtZero: true,
+                            grid: {
+                                drawOnChartArea: false,
+                            },
+                            title: {
+                                display: true,
+                                text: 'Unidades Vendidas'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        // El gráfico ya se creó en el canvas encontrado arriba
     } catch (e) {
         console.error('Error obteniendo ventas por temporada:', e);
+        if (cont) {
+            cont.innerHTML = '<div class="item">Error al cargar ventas por temporada.</div>';
+        }
     }
 }
 
 // ------------------ Rotación de Inventario (frontend helper) ------------------
-async function fetchRotacionInventario(top = 50) {
+async function cargarRotacionInventario() {
+    const cont = document.getElementById('reporteRotacion');
+    if (!cont) return;
+    cont.innerHTML = '<div class="item">Cargando rotación de inventario...</div>';
     try {
-        const res = await fetch(`/api/reportes/rotacion-inventario?top=${top}`);
+        const res = await fetch(`/api/reportes/rotacion-inventario?top=100`);
         const data = await res.json();
-        if (data && data.rows) {
-            // Puedes mostrar estos datos en una tabla o usar otra función para renderizarlos
-            console.log('Rotación inventario top', top, data.rows);
-            // Ejemplo: actualizar un contenedor si existe
-            const cont = document.getElementById('rotacionTabla');
-            if (cont) {
-                cont.innerHTML = data.rows.map(r => `
-                    <div class="item">
-                      <div><strong>${r.nombre}</strong> — ${r.categoria || ''}</div>
-                      <div>Stock: ${r.stock_actual} | Vendidas (últ. mes): ${r.unidades_vendidas_ultimo_mes} | Índice: ${parseFloat(r.indice_rotacion||0).toFixed(2)}</div>
-                    </div>
-                `).join('');
-            }
+        if (data && data.rows && data.rows.length > 0) {
+            let html = `<table style="width:100%;border-collapse:collapse;">
+                <thead>
+                    <tr style="background:var(--surface-alt);">
+                        <th style="padding:var(--spacing-md);text-align:left;">Producto</th>
+                        <th style="padding:var(--spacing-md);text-align:left;">Categoría</th>
+                        <th style="padding:var(--spacing-md);text-align:right;">Stock Actual</th>
+                        <th style="padding:var(--spacing-md);text-align:right;">Vendidas (últ. mes)</th>
+                        <th style="padding:var(--spacing-md);text-align:right;">Índice Rotación</th>
+                    </tr>
+                </thead>
+                <tbody>`;
+            data.rows.forEach(r => {
+                html += `<tr>
+                    <td style="padding:var(--spacing-md);">${r.marca || ''} ${r.nombre || ''}</td>
+                    <td style="padding:var(--spacing-md);">${r.categoria || 'N/A'}</td>
+                    <td style="padding:var(--spacing-md);text-align:right;">${r.stock_actual || 0}</td>
+                    <td style="padding:var(--spacing-md);text-align:right;">${r.unidades_vendidas_ultimo_mes || 0}</td>
+                    <td style="padding:var(--spacing-md);text-align:right;font-weight:600;">${parseFloat(r.indice_rotacion||0).toFixed(2)}</td>
+                </tr>`;
+            });
+            html += `</tbody></table>`;
+            cont.innerHTML = html;
+        } else {
+            cont.innerHTML = '<div class="item">No hay datos de rotación disponibles.</div>';
         }
     } catch (e) {
         console.error('Error al obtener rotación de inventario:', e);
+        cont.innerHTML = '<div class="item">Error al cargar rotación de inventario.</div>';
     }
 }
 
 function exportarReporteUtilidad() {
-    // Implementar exportación a Excel/CSV
-    alert('Funcionalidad de exportación pendiente');
+    try {
+        const tbody = document.getElementById('tbodyReporteUtilidad');
+        if (!tbody) {
+            alert('No hay datos para exportar');
+            return;
+        }
+        
+        const rows = tbody.querySelectorAll('tr');
+        if (rows.length === 0) {
+            alert('No hay datos para exportar');
+            return;
+        }
+        
+        let csv = 'Producto,Costo,Precio Venta,Utilidad Unitaria,Unidades Vendidas,Utilidad Total,Margen %\n';
+        rows.forEach(row => {
+            const cells = row.querySelectorAll('td');
+            if (cells.length >= 7) {
+                const line = Array.from(cells).map(cell => {
+                    let text = cell.textContent.trim();
+                    text = text.replace(/[$,%]/g, '');
+                    return `"${text}"`;
+                }).join(',');
+                csv += line + '\n';
+            }
+        });
+        
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+        link.setAttribute('href', url);
+        link.setAttribute('download', `reporte_utilidad_${new Date().toISOString().slice(0,10)}.csv`);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    } catch (e) {
+        console.error('Error exportando:', e);
+        alert('Error al exportar el reporte');
+    }
+}
+
+// Función para cambiar entre tabs de reportes
+window.switchReporteTab = function(tabName) {
+    // Ocultar todas las secciones
+    const sections = ['utilidad', 'inventario', 'compras', 'ventas', 'clientes', 'temporada', 'rotacion'];
+    sections.forEach(sec => {
+        const section = document.getElementById(`reporte-${sec}`);
+        if (section) section.style.display = 'none';
+        const tab = document.getElementById(`tab-${sec}`);
+        if (tab) tab.classList.remove('active');
+    });
+    
+    // Mostrar la sección seleccionada
+    const section = document.getElementById(`reporte-${tabName}`);
+    const tab = document.getElementById(`tab-${tabName}`);
+    if (section) section.style.display = 'block';
+    if (tab) tab.classList.add('active');
+    
+    // Cargar datos según el tab
+    setTimeout(() => {
+        switch(tabName) {
+            case 'utilidad':
+                cargarReporteUtilidad();
+                break;
+            case 'inventario':
+                renderReporteInventario();
+                break;
+            case 'compras':
+                renderReporteCompras();
+                break;
+            case 'ventas':
+                cargarVentasAdmin();
+                break;
+            case 'clientes':
+                cargarClientes();
+                break;
+            case 'temporada':
+                fetchVentasTemporada('actual');
+                break;
+            case 'rotacion':
+                cargarRotacionInventario();
+                break;
+        }
+    }, 100);
+};
+
+// Listeners para reportes
+if (typeof window !== 'undefined') {
+    window.addEventListener('DOMContentLoaded', function() {
+        // Listener para botón de reporte de inventario
+        const btnReporteInventario = document.getElementById('btnReporteInventario');
+        if (btnReporteInventario) {
+            btnReporteInventario.addEventListener('click', renderReporteInventario);
+        }
+        
+        // Listener para botón de reporte de compras
+        const btnReporteCompras = document.getElementById('btnReporteCompras');
+        if (btnReporteCompras) {
+            btnReporteCompras.addEventListener('click', renderReporteCompras);
+        }
+        
+        // Listener para select de temporada (en reportes)
+        const selectTemporada = document.getElementById('selectTemporada');
+        if (selectTemporada) {
+            selectTemporada.addEventListener('change', function() {
+                // Usar el canvas de reportes si estamos en la pestaña de reportes
+                fetchVentasTemporada(this.value);
+            });
+        }
+        
+        // Listener para select de temporada (en dashboard)
+        const selectTemporadaDashboard = document.getElementById('selectTemporadaDashboard');
+        if (selectTemporadaDashboard) {
+            selectTemporadaDashboard.addEventListener('change', function() {
+                fetchVentasTemporada(this.value);
+            });
+        }
+        
+        // Listener para búsqueda de ventas
+        const buscarVenta = document.getElementById('buscarVenta');
+        if (buscarVenta) {
+            buscarVenta.addEventListener('input', function() {
+                cargarVentasAdmin(this.value);
+            });
+        }
+        
+        // Listener para búsqueda de clientes
+        const buscarCliente = document.getElementById('buscarCliente');
+        if (buscarCliente) {
+            buscarCliente.addEventListener('input', function() {
+                cargarClientes(this.value);
+            });
+        }
+        
+        // Cargar datos iniciales cuando se muestran los reportes
+        setTimeout(() => {
+            // Si estamos en la pestaña de reportes, cargar datos según el tab activo
+            const reportesPanel = document.getElementById('reportesPanel');
+            if (reportesPanel && reportesPanel.style.display !== 'none') {
+                const tabUtilidad = document.getElementById('tab-utilidad');
+                if (tabUtilidad && tabUtilidad.classList.contains('active')) {
+                    cargarReporteUtilidad();
+                }
+                const tabVentas = document.getElementById('tab-ventas');
+                if (tabVentas && tabVentas.classList.contains('active')) {
+                    cargarVentasAdmin();
+                }
+                const tabClientes = document.getElementById('tab-clientes');
+                if (tabClientes && tabClientes.classList.contains('active')) {
+                    cargarClientes();
+                }
+                const tabTemporada = document.getElementById('tab-temporada');
+                if (tabTemporada && tabTemporada.classList.contains('active')) {
+                    fetchVentasTemporada('actual');
+                }
+            }
+        }, 500);
+        
+        // Listener para select de periodo de ingresos
+        const selectPeriodoIngresos = document.getElementById('selectPeriodoIngresos');
+        if (selectPeriodoIngresos) {
+            selectPeriodoIngresos.addEventListener('change', cargarIngresos);
+        }
+        
+        // Listener para formulario de registrar pago
+        const formRegistrarPago = document.getElementById('formRegistrarPago');
+        if (formRegistrarPago) {
+            formRegistrarPago.addEventListener('submit', async function(e) {
+                e.preventDefault();
+                try {
+                    const idCompra = document.getElementById('pagoIdCompra').value;
+                    const montoPagado = parseFloat(document.getElementById('pagoMonto').value || 0);
+                    const estadoPago = document.getElementById('pagoEstado').value;
+                    const metodoPago = document.getElementById('pagoMetodo').value;
+                    const referencia = document.getElementById('pagoReferencia').value;
+                    const notas = document.getElementById('pagoNotas').value;
+                    
+                    if (montoPagado <= 0) {
+                        alert('El monto a pagar debe ser mayor a 0');
+                        return;
+                    }
+                    
+                    const res = await fetch('/api/cuentas-pagar/pagar', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            id_compra: idCompra,
+                            monto_pagado: montoPagado,
+                            estado_pago: estadoPago,
+                            metodo_pago: metodoPago,
+                            referencia: referencia,
+                            notas: notas,
+                            monto_total: document.getElementById('pagoMontoPendiente').dataset.montoTotal || 0
+                        })
+                    });
+                    
+                    const data = await res.json();
+                    if (data.ok) {
+                        alert('Pago registrado correctamente');
+                        cerrarModal('modalRegistrarPago');
+                        cargarCuentasPagar();
+                    } else {
+                        alert('Error: ' + (data.error || 'No se pudo registrar el pago'));
+                    }
+                } catch (error) {
+                    console.error('Error registrando pago:', error);
+                    alert('Error de conexión');
+                }
+            });
+        }
+    });
+}
+
+// ==================== FUNCIONES GERENCIALES ====================
+// Cargar margen de ganancia por categoría con gráfica
+async function cargarMargenCategoria() {
+    try {
+        const res = await fetch('/api/reportes/margen-categoria');
+        const data = await res.json();
+        
+        if (!data.ok || !data.categorias || data.categorias.length === 0) {
+            console.log('No hay datos de margen por categoría');
+            return;
+        }
+        
+        // Actualizar gráfico de márgenes si existe (en dashboard o reportes)
+        const canvas = document.getElementById('margenChart');
+        if (canvas && typeof Chart !== 'undefined') {
+            const ctx = canvas.getContext('2d');
+            const labels = data.categorias.map(c => c.categoria);
+            const margenes = data.categorias.map(c => Number(c.margen_promedio || 0));
+            
+            if (window.margenChartInstance) {
+                window.margenChartInstance.destroy();
+            }
+            
+            window.margenChartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Margen de Ganancia (%)',
+                        data: margenes,
+                        backgroundColor: data.categorias.map((c, i) => {
+                            const colors = ['rgba(37, 99, 235, 0.6)', 'rgba(16, 185, 129, 0.6)', 'rgba(245, 158, 11, 0.6)', 'rgba(239, 68, 68, 0.6)', 'rgba(139, 92, 246, 0.6)'];
+                            return colors[i % colors.length];
+                        }),
+                        borderColor: data.categorias.map((c, i) => {
+                            const colors = ['rgb(37, 99, 235)', 'rgb(16, 185, 129)', 'rgb(245, 158, 11)', 'rgb(239, 68, 68)', 'rgb(139, 92, 246)'];
+                            return colors[i % colors.length];
+                        }),
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top'
+                        },
+                        title: {
+                            display: true,
+                            text: 'Margen de Ganancia por Categoría',
+                            font: {
+                                size: 16,
+                                weight: 'bold'
+                            }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const cat = data.categorias[context.dataIndex];
+                                    return [
+                                        'Margen: ' + context.parsed.y.toFixed(2) + '%',
+                                        'Utilidad: $' + parseFloat(cat.utilidad_total || 0).toFixed(2),
+                                        'Ventas: $' + parseFloat(cat.total_ventas || 0).toFixed(2)
+                                    ];
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                callback: function(value) {
+                                    return value + '%';
+                                }
+                            },
+                            title: {
+                                display: true,
+                                text: 'Margen (%)'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+    } catch (e) {
+        console.error('Error cargando margen por categoría:', e);
+    }
+}
+
+// Cargar top 10 utilidad por producto
+async function cargarTop10Utilidad() {
+    try {
+        const res = await fetch('/api/reportes/utilidad-top10');
+        const data = await res.json();
+        
+        if (!data.ok || !data.productos || data.productos.length === 0) {
+            const tbody = document.getElementById('tbodyUtilidad');
+            if (tbody) {
+                tbody.innerHTML = '<tr><td colspan="4" style="padding:var(--spacing-md);text-align:center;">No hay datos de utilidad disponibles</td></tr>';
+            }
+            return;
+        }
+        
+        // Actualizar tabla de utilidad en dashboard
+        const tbody = document.getElementById('tbodyUtilidad');
+        if (tbody) {
+            tbody.innerHTML = data.productos.map(prod => `
+                <tr style="border-bottom:1px solid var(--surface-alt);">
+                    <td style="padding:var(--spacing-md);">${prod.nombre || 'N/A'}</td>
+                    <td style="padding:var(--spacing-md);text-align:right;">$${parseFloat(prod.total_ventas || 0).toFixed(2)}</td>
+                    <td style="padding:var(--spacing-md);text-align:right;">$${parseFloat(prod.utilidad_total || 0).toFixed(2)}</td>
+                    <td style="padding:var(--spacing-md);text-align:right;">${parseFloat(prod.margen_porcentaje || 0).toFixed(1)}%</td>
+                </tr>
+            `).join('');
+        }
+    } catch (e) {
+        console.error('Error cargando top 10 utilidad:', e);
+        const tbody = document.getElementById('tbodyUtilidad');
+        if (tbody) {
+            tbody.innerHTML = '<tr><td colspan="4" style="padding:var(--spacing-md);text-align:center;">Error al cargar datos</td></tr>';
+        }
+    }
 }
 

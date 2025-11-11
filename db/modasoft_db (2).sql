@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Servidor: 127.0.0.1
--- Tiempo de generación: 02-11-2025 a las 02:39:40
+-- Tiempo de generación: 12-11-2025 a las 00:23:07
 -- Versión del servidor: 10.4.32-MariaDB
 -- Versión de PHP: 8.2.12
 
@@ -37,8 +37,14 @@ CREATE TABLE `categorias` (
 --
 
 INSERT INTO `categorias` (`id_categoria`, `nombre`) VALUES
-(27, 'blusas'),
-(24, 'camisas');
+(34, 'blusas'),
+(36, 'camisa'),
+(32, 'franelillas'),
+(38, 'monos'),
+(31, 'pantalones'),
+(37, 'shemin'),
+(33, 'shores'),
+(35, 'zapato');
 
 -- --------------------------------------------------------
 
@@ -59,9 +65,8 @@ CREATE TABLE `clientes` (
 --
 
 INSERT INTO `clientes` (`id_cliente`, `nombre`, `cedula`, `telefono`, `email`) VALUES
-(3, 'frankelvs', '30928764', '123456', 'fra@gmail.con'),
-(4, 'alexandra', '30528764', '123456789', 'ale@gmail.com'),
-(5, 'alexandra', '30528711', '123456', 'ale@gmail.com');
+(6, 'frankelvs', '30928764', '123456', 'fra@gmail.con'),
+(7, 'yoileanys', '31319207', '04143500330', 'agvcsguw@gmail.com');
 
 -- --------------------------------------------------------
 
@@ -82,9 +87,18 @@ CREATE TABLE `compras` (
 --
 
 INSERT INTO `compras` (`id_compra`, `id_proveedor`, `fecha_compra`, `total_compra`, `estado_pago`) VALUES
-(3, 1, '2025-10-29', 300.00, 'Pendiente'),
-(4, 1, '2025-10-27', 150.00, 'Pagada'),
-(5, 1, '2025-11-01', 300.00, 'Pagada');
+(8, 1, '2025-11-05', 80.00, 'Pagada'),
+(9, 9, '2025-11-04', 100.00, 'Pagada'),
+(10, 9, '2025-11-05', 50.00, 'Pagada'),
+(11, 9, '2025-11-05', 23.00, 'Pagada'),
+(12, 1, '2025-11-07', 80.00, 'Pagada'),
+(13, 1, '2025-11-07', 40.00, 'Pagada'),
+(14, 1, '2025-11-07', 16.00, 'Pendiente'),
+(15, 1, '2025-11-07', 8.00, 'Parcial'),
+(16, 1, '2025-11-07', 16.00, 'PARCIAL'),
+(17, 4, '2025-11-07', 50.00, 'Pagada'),
+(18, 9, '2025-11-08', 39.00, 'Parcial'),
+(19, 1, '2025-11-08', 29.40, 'Pagada');
 
 -- --------------------------------------------------------
 
@@ -122,7 +136,8 @@ CREATE TABLE `configuracion` (
 --
 
 INSERT INTO `configuracion` (`id_config`, `clave`, `valor`, `descripcion`) VALUES
-(1, 'clave_devoluciones', 'devol123', 'Clave de acceso para módulo de devoluciones');
+(1, 'devol123', '', 'devoluciones'),
+(8, 'clave_devoluciones', 'devol123', 'Clave de acceso para módulo de devoluciones');
 
 -- --------------------------------------------------------
 
@@ -143,6 +158,13 @@ CREATE TABLE `cuentas_por_pagar` (
   `notas` text DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+--
+-- Volcado de datos para la tabla `cuentas_por_pagar`
+--
+
+INSERT INTO `cuentas_por_pagar` (`id_cuenta`, `id_proveedor`, `id_compra`, `monto_total`, `monto_pagado`, `monto_pendiente`, `fecha_vencimiento`, `estado`, `fecha_registro`, `notas`) VALUES
+(1, 1, 16, 16.00, 7.98, 8.02, '2025-12-07', 'PARCIAL', '2025-11-07 15:00:17', NULL);
+
 -- --------------------------------------------------------
 
 --
@@ -162,9 +184,21 @@ CREATE TABLE `detallecompra` (
 --
 
 INSERT INTO `detallecompra` (`id_detalle`, `id_compra`, `id_producto`, `cantidad`, `costo_unitario`) VALUES
-(1, 3, 23, 20, 15.00),
-(2, 4, 23, 10, 15.00),
-(3, 5, 23, 20, 15.00);
+(6, 8, 34, 10, 8.00),
+(7, 9, 35, 25, 4.00),
+(8, 10, 36, 5, 10.00),
+(9, 11, 36, 2, 10.00),
+(10, 11, 37, 3, 1.00),
+(11, 12, 34, 5, 8.00),
+(12, 12, 34, 5, 8.00),
+(13, 13, 34, 5, 8.00),
+(14, 14, 34, 2, 8.00),
+(15, 15, 34, 1, 8.00),
+(16, 16, 34, 2, 8.00),
+(17, 17, 38, 5, 10.00),
+(18, 18, 39, 10, 3.00),
+(19, 18, 39, 3, 3.00),
+(20, 19, 40, 3, 9.80);
 
 -- --------------------------------------------------------
 
@@ -178,8 +212,25 @@ CREATE TABLE `detalleventa` (
   `id_producto` int(11) NOT NULL,
   `id_talla` int(11) NOT NULL,
   `cantidad` int(11) NOT NULL,
-  `precio_unitario` decimal(10,2) NOT NULL
+  `precio_unitario` decimal(10,2) NOT NULL,
+  `id_promocion_aplicada` int(11) DEFAULT NULL,
+  `descuento_unitario` decimal(12,2) DEFAULT NULL,
+  `descuento_total` decimal(12,2) DEFAULT NULL,
+  `producto_nombre` varchar(255) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Volcado de datos para la tabla `detalleventa`
+--
+
+INSERT INTO `detalleventa` (`id_detalle`, `id_venta`, `id_producto`, `id_talla`, `cantidad`, `precio_unitario`, `id_promocion_aplicada`, `descuento_unitario`, `descuento_total`, `producto_nombre`) VALUES
+(19, 49, 34, 5, 1, 10.00, 16, 1.00, 1.00, NULL),
+(20, 50, 35, 3, 1, 6.00, NULL, 0.00, 0.00, NULL),
+(21, 51, 36, 4, 1, 20.00, NULL, 0.00, 0.00, NULL),
+(22, 51, 36, 3, 1, 20.00, NULL, 0.00, 0.00, NULL),
+(23, 52, 36, 4, 2, 20.00, 18, 1.00, 2.00, NULL),
+(24, 52, 34, 4, 2, 10.00, NULL, 0.00, 0.00, NULL),
+(25, 53, 34, 5, 2, 10.00, NULL, 0.00, 0.00, NULL);
 
 -- --------------------------------------------------------
 
@@ -194,6 +245,13 @@ CREATE TABLE `devoluciones` (
   `cantidad` int(11) NOT NULL,
   `monto_reembolsado` decimal(10,2) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Volcado de datos para la tabla `devoluciones`
+--
+
+INSERT INTO `devoluciones` (`id_devolucion`, `id_detalle`, `fecha_hora`, `cantidad`, `monto_reembolsado`) VALUES
+(2, 20, '2025-11-05 14:13:29', 1, 6.00);
 
 -- --------------------------------------------------------
 
@@ -214,14 +272,30 @@ CREATE TABLE `inventario` (
 --
 
 INSERT INTO `inventario` (`id_inventario`, `id_producto`, `id_talla`, `cantidad`, `costo_promedio`) VALUES
-(29, 23, 5, 2, 0.00),
-(30, 23, 4, 2, 0.00),
-(31, 23, 3, 2, 0.00),
-(32, 23, 2, 4, 0.00),
-(33, 24, 5, 2, 0.00),
-(34, 24, 4, 2, 0.00),
-(35, 24, 3, 4, 0.00),
-(36, 24, 2, 2, 0.00);
+(69, 34, 5, 5, 0.00),
+(70, 34, 4, 6, 0.00),
+(71, 34, 3, 2, 0.00),
+(72, 34, 2, 4, 0.00),
+(73, 35, 5, 5, 0.00),
+(74, 35, 4, 5, 0.00),
+(75, 35, 3, 5, 0.00),
+(76, 35, 12, 5, 0.00),
+(77, 35, 2, 5, 0.00),
+(78, 36, 5, 3, 0.00),
+(79, 36, 4, 2, 0.00),
+(80, 36, 3, 3, 0.00),
+(81, 36, 12, 8, 0.00),
+(82, 37, 5, 4, 0.00),
+(83, 37, 4, 6, 0.00),
+(84, 37, 3, 1, 0.00),
+(85, 37, 12, 2, 0.00),
+(86, 37, 2, 6, 0.00),
+(87, 34, 12, 5, 0.00),
+(88, 34, 13, 3, 0.00),
+(89, 38, 5, 5, 0.00),
+(90, 39, 3, 10, 0.00),
+(91, 39, 5, 3, 0.00),
+(92, 40, 4, 3, 0.00);
 
 -- --------------------------------------------------------
 
@@ -274,6 +348,13 @@ CREATE TABLE `pagos_proveedores` (
   `notas` text DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+--
+-- Volcado de datos para la tabla `pagos_proveedores`
+--
+
+INSERT INTO `pagos_proveedores` (`id_pago`, `id_cuenta`, `monto`, `fecha_pago`, `metodo_pago`, `referencia`, `id_usuario`, `notas`) VALUES
+(1, 1, 7.98, '2025-11-07 15:00:17', 'EFECTIVO', NULL, 2, NULL);
+
 -- --------------------------------------------------------
 
 --
@@ -296,8 +377,13 @@ CREATE TABLE `productos` (
 --
 
 INSERT INTO `productos` (`id_producto`, `nombre`, `marca`, `descripcion`, `precio_venta`, `inventario`, `id_categoria`, `id_proveedor`) VALUES
-(23, 'primavera', 'shein', NULL, 20.00, 60, 27, 4),
-(24, 'primavera', 'Fast Fashion', NULL, 2.00, 10, 24, 4);
+(34, 'tomy', 'shein', NULL, 10.00, 35, 31, 1),
+(35, 'algodon', 'ovejita', NULL, 6.00, 50, 32, 9),
+(36, 'navideñas', 'picola', NULL, 20.00, 23, 32, 9),
+(37, 'otoño', 'ovejita', NULL, 8.00, 22, 32, 9),
+(38, 'cuadro', 'gucci', NULL, 15.00, 5, 33, 4),
+(39, 'flores', 'Fast Fashion', NULL, 5.00, 13, 34, 9),
+(40, 'air', 'nike', NULL, 10.00, 3, 35, 1);
 
 -- --------------------------------------------------------
 
@@ -316,8 +402,17 @@ CREATE TABLE `promociones` (
   `activa` tinyint(1) NOT NULL DEFAULT 1,
   `id_categoria` int(11) DEFAULT NULL COMMENT 'Si aplica a una categoría específica',
   `id_producto` int(11) DEFAULT NULL COMMENT 'Si aplica a un producto específico',
-  `minimo_compra` decimal(10,2) DEFAULT 0.00 COMMENT 'Monto mínimo de compra'
+  `minimo_compra` decimal(10,2) DEFAULT 0.00 COMMENT 'Monto mínimo de compra',
+  `param_x` int(11) DEFAULT NULL,
+  `param_y` int(11) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Volcado de datos para la tabla `promociones`
+--
+
+INSERT INTO `promociones` (`id_promocion`, `nombre`, `descripcion`, `tipo_promocion`, `valor`, `fecha_inicio`, `fecha_fin`, `activa`, `id_categoria`, `id_producto`, `minimo_compra`, `param_x`, `param_y`) VALUES
+(18, 'naviidad', NULL, 'DESCUENTO_PORCENTAJE', 5.00, '2025-11-05', '2025-11-10', 1, 32, 36, 2.00, NULL, NULL);
 
 -- --------------------------------------------------------
 
@@ -338,7 +433,8 @@ CREATE TABLE `proveedores` (
 
 INSERT INTO `proveedores` (`id_proveedor`, `nombre`, `contacto`, `telefono`) VALUES
 (1, 'fran', '123', '123'),
-(4, 'yoileannys', 'jfdutrd', '5649846485');
+(4, 'yoileannys', 'jfdutrd', '5649846485'),
+(9, 'alexandra', 'chugeh', '0763368887');
 
 -- --------------------------------------------------------
 
@@ -383,7 +479,9 @@ INSERT INTO `tallas` (`id_talla`, `nombre`, `ajuste`, `pecho`, `cintura`, `cader
 (2, 'xxl', 'Oversized', NULL, NULL, NULL, NULL),
 (3, 's', NULL, NULL, NULL, NULL, NULL),
 (4, 'm', NULL, NULL, NULL, NULL, NULL),
-(5, 'l | Ajuste', 'Slim', 20, 20, 20, 20);
+(5, 'l | Ajuste', 'Slim', 20, 20, 20, 20),
+(12, 'xl', NULL, NULL, NULL, NULL, NULL),
+(13, 'xs', NULL, NULL, NULL, NULL, NULL);
 
 -- --------------------------------------------------------
 
@@ -427,13 +525,11 @@ CREATE TABLE `ventas` (
 --
 
 INSERT INTO `ventas` (`id_venta`, `fecha_hora`, `total_venta`, `tipo_pago`, `id_usuario`, `id_cliente`) VALUES
-(13, '2025-11-01 15:37:25', 40.00, 'Pago Móvil', 1, 3),
-(14, '2025-11-01 15:46:14', 40.00, 'Efectivo Bolívares', 1, 3),
-(27, '2025-11-01 16:40:46', 40.00, 'Pago Móvil', 1, 3),
-(28, '2025-11-01 16:45:46', 40.00, 'Pago Móvil', 1, 4),
-(29, '2025-11-01 17:22:46', 40.00, 'Pago Móvil', 1, 5),
-(30, '2025-11-01 17:23:02', 40.00, 'Pago Móvil', 1, 5),
-(31, '2025-11-01 17:28:10', 40.00, 'Pago Móvil', 1, 5);
+(49, '2025-11-05 13:01:40', 9.00, 'Transferencia', 1, 6),
+(50, '2025-11-05 14:12:40', 0.00, 'Punto de venta', 1, 7),
+(51, '2025-11-05 15:12:31', 40.00, 'Punto de venta', 1, 7),
+(52, '2025-11-05 15:27:03', 58.00, 'Pago Móvil', 1, 7),
+(53, '2025-11-07 13:42:48', 20.00, 'Pago Móvil', 1, 7);
 
 -- --------------------------------------------------------
 
@@ -606,7 +702,8 @@ ALTER TABLE `detalleventa`
   ADD PRIMARY KEY (`id_detalle`),
   ADD KEY `id_venta` (`id_venta`),
   ADD KEY `id_producto` (`id_producto`),
-  ADD KEY `id_talla` (`id_talla`);
+  ADD KEY `id_talla` (`id_talla`),
+  ADD KEY `idx_detalleventa_promocion` (`id_promocion_aplicada`);
 
 --
 -- Indices de la tabla `devoluciones`
@@ -660,7 +757,9 @@ ALTER TABLE `productos`
 ALTER TABLE `promociones`
   ADD PRIMARY KEY (`id_promocion`),
   ADD KEY `id_categoria` (`id_categoria`),
-  ADD KEY `id_producto` (`id_producto`);
+  ADD KEY `id_producto` (`id_producto`),
+  ADD KEY `idx_promociones_activa` (`activa`),
+  ADD KEY `idx_promociones_fecha` (`fecha_inicio`,`fecha_fin`);
 
 --
 -- Indices de la tabla `proveedores`
@@ -706,19 +805,19 @@ ALTER TABLE `ventas`
 -- AUTO_INCREMENT de la tabla `categorias`
 --
 ALTER TABLE `categorias`
-  MODIFY `id_categoria` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=30;
+  MODIFY `id_categoria` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=39;
 
 --
 -- AUTO_INCREMENT de la tabla `clientes`
 --
 ALTER TABLE `clientes`
-  MODIFY `id_cliente` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
+  MODIFY `id_cliente` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=8;
 
 --
 -- AUTO_INCREMENT de la tabla `compras`
 --
 ALTER TABLE `compras`
-  MODIFY `id_compra` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
+  MODIFY `id_compra` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=20;
 
 --
 -- AUTO_INCREMENT de la tabla `conciliacion_bancaria`
@@ -730,37 +829,37 @@ ALTER TABLE `conciliacion_bancaria`
 -- AUTO_INCREMENT de la tabla `configuracion`
 --
 ALTER TABLE `configuracion`
-  MODIFY `id_config` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=8;
+  MODIFY `id_config` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=9;
 
 --
 -- AUTO_INCREMENT de la tabla `cuentas_por_pagar`
 --
 ALTER TABLE `cuentas_por_pagar`
-  MODIFY `id_cuenta` int(11) NOT NULL AUTO_INCREMENT;
+  MODIFY `id_cuenta` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
 
 --
 -- AUTO_INCREMENT de la tabla `detallecompra`
 --
 ALTER TABLE `detallecompra`
-  MODIFY `id_detalle` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
+  MODIFY `id_detalle` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=21;
 
 --
 -- AUTO_INCREMENT de la tabla `detalleventa`
 --
 ALTER TABLE `detalleventa`
-  MODIFY `id_detalle` int(11) NOT NULL AUTO_INCREMENT;
+  MODIFY `id_detalle` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=26;
 
 --
 -- AUTO_INCREMENT de la tabla `devoluciones`
 --
 ALTER TABLE `devoluciones`
-  MODIFY `id_devolucion` int(11) NOT NULL AUTO_INCREMENT;
+  MODIFY `id_devolucion` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
 
 --
 -- AUTO_INCREMENT de la tabla `inventario`
 --
 ALTER TABLE `inventario`
-  MODIFY `id_inventario` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=37;
+  MODIFY `id_inventario` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=93;
 
 --
 -- AUTO_INCREMENT de la tabla `movimientoscaja`
@@ -778,25 +877,25 @@ ALTER TABLE `movimientos_bancarios`
 -- AUTO_INCREMENT de la tabla `pagos_proveedores`
 --
 ALTER TABLE `pagos_proveedores`
-  MODIFY `id_pago` int(11) NOT NULL AUTO_INCREMENT;
+  MODIFY `id_pago` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
 
 --
 -- AUTO_INCREMENT de la tabla `productos`
 --
 ALTER TABLE `productos`
-  MODIFY `id_producto` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=25;
+  MODIFY `id_producto` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=41;
 
 --
 -- AUTO_INCREMENT de la tabla `promociones`
 --
 ALTER TABLE `promociones`
-  MODIFY `id_promocion` int(11) NOT NULL AUTO_INCREMENT;
+  MODIFY `id_promocion` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=19;
 
 --
 -- AUTO_INCREMENT de la tabla `proveedores`
 --
 ALTER TABLE `proveedores`
-  MODIFY `id_proveedor` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=8;
+  MODIFY `id_proveedor` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=10;
 
 --
 -- AUTO_INCREMENT de la tabla `roles`
@@ -808,7 +907,7 @@ ALTER TABLE `roles`
 -- AUTO_INCREMENT de la tabla `tallas`
 --
 ALTER TABLE `tallas`
-  MODIFY `id_talla` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=11;
+  MODIFY `id_talla` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=14;
 
 --
 -- AUTO_INCREMENT de la tabla `usuarios`
@@ -820,7 +919,7 @@ ALTER TABLE `usuarios`
 -- AUTO_INCREMENT de la tabla `ventas`
 --
 ALTER TABLE `ventas`
-  MODIFY `id_venta` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=32;
+  MODIFY `id_venta` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=54;
 
 --
 -- Restricciones para tablas volcadas
@@ -924,97 +1023,3 @@ COMMIT;
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
 /*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
-
--- -------------------------------------------------------------------------
--- Extensiones para soporte de promociones avanzadas y trazabilidad
--- Estas sentencias añaden columnas opcionales para COMPRA_X_LLEVA_Y
--- y columnas en detalleventa para registrar la promoción aplicada y los descuentos.
--- Ejecuta estas sentencias en phpMyAdmin si deseas activar estas funciones.
--- HAZ BACKUP antes de ejecutar.
--- -------------------------------------------------------------------------
-
--- 1) Añadir columnas param_x/param_y a promociones (si no existen)
-ALTER TABLE promociones
-  ADD COLUMN IF NOT EXISTS param_x INT NULL,
-  ADD COLUMN IF NOT EXISTS param_y INT NULL;
-
--- 2) Añadir columnas de trazabilidad en detalleventa (si la tabla existe)
-ALTER TABLE detalleventa
-  ADD COLUMN IF NOT EXISTS id_promocion_aplicada INT NULL,
-  ADD COLUMN IF NOT EXISTS descuento_unitario DECIMAL(12,2) NULL,
-  ADD COLUMN IF NOT EXISTS descuento_total DECIMAL(12,2) NULL;
-
--- 3) Índice y FK opcionales para detalleventa.id_promocion_aplicada
-CREATE INDEX IF NOT EXISTS idx_detalleventa_promocion ON detalleventa (id_promocion_aplicada);
-
--- Nota: algunas versiones de MariaDB/MySQL no soportan IF NOT EXISTS en ADD CONSTRAINT.
--- Si la instrucción siguiente falla, revisa previamente si la FK ya existe mediante:
--- SELECT CONSTRAINT_NAME FROM information_schema.TABLE_CONSTRAINTS
--- WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'detalleventa' AND CONSTRAINT_TYPE = 'FOREIGN KEY';
-ALTER TABLE detalleventa
-  ADD CONSTRAINT IF NOT EXISTS fk_detalleventa_promocion
-  FOREIGN KEY (id_promocion_aplicada) REFERENCES promociones(id_promocion)
-  ON DELETE SET NULL ON UPDATE CASCADE;
-
--- 4) Índices útiles en promociones
-ALTER TABLE promociones
-  ADD INDEX IF NOT EXISTS idx_promociones_activa (activa),
-  ADD INDEX IF NOT EXISTS idx_promociones_fecha (fecha_inicio, fecha_fin);
-
--- Fin de las extensiones para promociones avanzadas
-
--- -------------------------------------------------------------------------
--- Opcional: agregar columna producto_nombre en detalleventa y trigger
--- Esto es útil para mantener el nombre del producto en el detalle en el momento
--- de la venta (histórico), evitando joins costosos en reportes.
--- Ejecuta sólo si quieres esta copia denormalizada.
--- -------------------------------------------------------------------------
-
-ALTER TABLE detalleventa
-  ADD COLUMN IF NOT EXISTS producto_nombre VARCHAR(255) NULL;
-
--- Crear trigger para rellenar producto_nombre al insertar en detalleventa
--- Nota: requiere privilegios para crear triggers. Si tu servidor no permite
--- DELIMITER en este contexto, ejecuta las siguientes líneas directamente
--- desde un cliente MySQL (phpMyAdmin o CLI).
-
--- START TRIGGER (ejecutar en cliente que soporte delimitadores)
--- DELIMITER $$
--- CREATE TRIGGER trg_detalleventa_before_insert
--- BEFORE INSERT ON detalleventa
--- FOR EACH ROW
--- BEGIN
---   IF NEW.producto_nombre IS NULL OR NEW.producto_nombre = '' THEN
---     DECLARE _nombre VARCHAR(255);
---     SELECT nombre INTO _nombre FROM productos WHERE id_producto = NEW.id_producto LIMIT 1;
---     SET NEW.producto_nombre = _nombre;
---   END IF;
--- END$$
--- DELIMITER ;
--- END TRIGGER
-
--- -------------------------------------------------------------------------
--- Ejemplos de datos de prueba (usar sólo en entorno de pruebas)
--- -------------------------------------------------------------------------
--- 1) Promoción 10% global válida 30 días
--- INSERT INTO promociones (nombre, descripcion, tipo_promocion, valor, fecha_inicio, fecha_fin, activa, id_categoria, id_producto, minimo_compra, param_x, param_y)
--- VALUES ('Test 10% Global', 'Descuento 10% para pruebas', 'DESCUENTO_PORCENTAJE', 10, CURDATE(), DATE_ADD(CURDATE(), INTERVAL 30 DAY), 1, NULL, NULL, 0, NULL, NULL);
-
--- 2) Promoción Compra 2 Lleva 1 para producto ejemplo (reemplaza 23 por id real)
--- INSERT INTO promociones (nombre, descripcion, tipo_promocion, valor, fecha_inicio, fecha_fin, activa, id_categoria, id_producto, minimo_compra, param_x, param_y)
--- VALUES ('Compra 2 Lleva 1 Test', 'Compra 2 y llévate 1 gratis en producto 23', 'COMPRA_X_LLEVA_Y', 0, CURDATE(), DATE_ADD(CURDATE(), INTERVAL 30 DAY), 1, NULL, 23, 0, 2, 1);
-
--- 3) Ejemplo manual de venta y detalle (solo para pruebas manuales):
--- INSERT INTO ventas (fecha_hora, total_venta, tipo_pago, id_usuario, id_cliente) VALUES (NOW(), 100.00, 'Efectivo', 1, NULL);
--- -- Reemplaza 999 por el id_venta generado
--- INSERT INTO detalleventa (id_venta, id_producto, id_talla, cantidad, precio_unitario, id_promocion_aplicada, descuento_unitario, descuento_total, producto_nombre)
--- VALUES (999, 23, NULL, 3, 10.00, 1, 1.00, 3.00, 'Nombre producto 23');
-
--- -------------------------------------------------------------------------
--- Notas de ejecución segura:
--- 1) Haz backup antes de aplicar: mysqldump -u <user> -p <db> > backup.sql
--- 2) Revisa columnas existentes:
---    SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'detalleventa';
--- 3) Ejecuta ALTERs uno a uno si tu servidor no soporta IF NOT EXISTS.
--- 4) Para crear el trigger, usa un cliente que soporte delimitadores (phpMyAdmin o CLI).
--- -------------------------------------------------------------------------
