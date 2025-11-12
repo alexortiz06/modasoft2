@@ -1773,3 +1773,252 @@ async function cargarTop10Utilidad() {
     }
 }
 
+
+// ==================== GESTIÓN DE CLIENTES ====================
+async function cargarClientesAdmin(busqueda = '') {
+    try {
+        const response = await fetch('/api/clientes');
+        const data = await response.json();
+        const listaClientes = document.getElementById('listaClientesAdmin');
+
+        if (!listaClientes) return;
+
+        if (data.ok && data.clientes && data.clientes.length > 0) {
+            // Filtrar en el cliente para el ejemplo (mejor en el servidor)
+            const clientesFiltrados = busqueda
+                ? data.clientes.filter(c =>
+                    c.nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
+                    c.apellido?.toLowerCase().includes(busqueda.toLowerCase()) ||
+                    c.email?.toLowerCase().includes(busqueda.toLowerCase())
+                  )
+                : data.clientes;
+
+            listaClientes.innerHTML = clientesFiltrados.map(cliente => `
+                <div class="item">
+                    <span class="item-title">${cliente.nombre} ${cliente.apellido || ''}</span>
+                    <span class="item-detail">${cliente.email} | Tel: ${cliente.telefono || 'N/A'}</span>
+                    <button class="btn btn-sm btn-info" onclick="editarCliente(${cliente.id_cliente})">Editar</button>
+                </div>
+            `).join('');
+        } else {
+            listaClientes.innerHTML = '<div class="item">No hay clientes registrados.</div>';
+        }
+
+    } catch (e) {
+        console.error('Error cargando clientes:', e);
+    }
+}
+
+// Llama a esta función al cargar el DOM si estás en el panel de clientes
+document.addEventListener('DOMContentLoaded', function() {
+    if (document.getElementById('clientesPanel')) {
+        cargarClientesAdmin();
+        // Agregar listener de búsqueda si tienes un campo de búsqueda en el panel de clientes
+        // const inputBuscarClientes = document.getElementById('buscarClienteAdmin');
+        // ... (similar a la búsqueda de ventas)
+    }
+});
+
+// ==================== REPORTES ====================
+
+// Chart.js instance storage
+let ventasChart;
+let comprasChart;
+let clientesChart;
+let temporadaChart;
+
+function prepararReportes() {
+    // Solo se ejecutan si estamos en el panel de reportes
+    if (!document.getElementById('reportesPanel')) return;
+
+    cargarReporteVentasMensual();
+    cargarReporteComprasMensual();
+    cargarReporteTopClientes();
+    cargarReporteTendenciasTemporada();
+    cargarReporteInventarioLento(); // Reporte adicional
+
+    // Listener para cambiar el tipo de reporte visible
+    document.querySelectorAll('.reporte-switch').forEach(link => {
+        link.addEventListener('click', function(e) {
+            e.preventDefault();
+            const targetId = this.getAttribute('data-target');
+            document.querySelectorAll('.reporte-section').forEach(section => {
+                section.style.display = 'none';
+            });
+            const targetSection = document.getElementById(targetId);
+            if (targetSection) targetSection.style.display = 'block';
+
+            document.querySelectorAll('.reporte-switch').forEach(l => l.classList.remove('active'));
+            this.classList.add('active');
+        });
+    });
+
+    // Mostrar el primer reporte por defecto
+    const primerReporte = document.querySelector('.reporte-switch');
+    if(primerReporte) primerReporte.click();
+}
+
+// Venta Mensual
+async function cargarReporteVentasMensual() {
+    try {
+        const response = await fetch('/api/reportes/ventas/mensual');
+        const data = await response.json();
+        
+        if (data.ok && data.data) {
+            const ctx = document.getElementById('ventasChartReportes').getContext('2d');
+            const labels = data.data.map(item => item.mes);
+            const totales = data.data.map(item => parseFloat(item.total_ventas));
+            
+            if (ventasChart) ventasChart.destroy();
+
+            ventasChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Ingresos por Mes',
+                        data: totales,
+                        backgroundColor: 'rgba(37, 99, 235, 0.5)', // var(--primary)
+                        borderColor: 'rgba(37, 99, 235, 1)',
+                        borderWidth: 2,
+                        tension: 0.3
+                    }]
+                }
+                // ... opciones de chartjs
+            });
+        }
+    } catch (e) {
+        console.error('Error al cargar Reporte de Ventas:', e);
+    }
+}
+
+// Compra Mensual
+async function cargarReporteComprasMensual() {
+    try {
+        const response = await fetch('/api/reportes/compras/mensual');
+        const data = await response.json();
+
+        if (data.ok && data.data) {
+            const ctx = document.getElementById('comprasChartReportes').getContext('2d');
+            const labels = data.data.map(item => item.mes);
+            const totales = data.data.map(item => parseFloat(item.total_compras));
+
+            if (comprasChart) comprasChart.destroy();
+
+            comprasChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Gastos por Compra Mensual',
+                        data: totales,
+                        backgroundColor: 'rgba(239, 68, 68, 0.7)', // var(--error)
+                        borderWidth: 1
+                    }]
+                }
+            });
+        }
+    } catch (e) {
+        console.error('Error al cargar Reporte de Compras:', e);
+    }
+}
+
+// Top Clientes
+async function cargarReporteTopClientes() {
+    try {
+        const response = await fetch('/api/reportes/clientes/top');
+        const data = await response.json();
+        const listaClientes = document.getElementById('reporteTopClientes');
+        
+        if (!listaClientes) return;
+        listaClientes.innerHTML = ''; // Limpiar
+
+        if (data.ok && data.data && data.data.length > 0) {
+            listaClientes.innerHTML = data.data.map(cliente => `
+                <div class="item">
+                    <span class="item-title">${cliente.nombre} ${cliente.apellido || ''}</span>
+                    <span class="item-detail">Gasto: $${parseFloat(cliente.gasto_total).toFixed(2)} (${cliente.total_compras} Compras)</span>
+                </div>
+            `).join('');
+        } else {
+            listaClientes.innerHTML = '<div class="item">No hay datos de clientes para el ranking.</div>';
+        }
+    } catch (e) {
+        console.error('Error al cargar Reporte Top Clientes:', e);
+    }
+}
+
+// Reporte de Temporada (Tendencias por Categoría)
+async function cargarReporteTendenciasTemporada() {
+    try {
+        const response = await fetch('/api/reportes/tendencias/categorias');
+        const data = await response.json();
+        
+        if (data.ok && data.data) {
+            const ctx = document.getElementById('temporadaChartReportes').getContext('2d');
+            const labels = data.data.map(item => item.categoria);
+            const ingresos = data.data.map(item => parseFloat(item.ingresos_categoria));
+            
+            if (temporadaChart) temporadaChart.destroy();
+
+            temporadaChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Ingresos por Categoría',
+                        data: ingresos,
+                        backgroundColor: [ // Usa una paleta de colores
+                            '#2563eb', '#10b981', '#f59e0b', '#ef4444', '#34d399', '#3b82f6', '#1e40af', '#059669', '#f97316'
+                        ],
+                    }]
+                }
+                // ... opciones de chartjs
+            });
+
+            // Actualizar el título para reflejar que es por categoría
+            const titulo = document.querySelector('#reporte-temporada .chart-title');
+            if (titulo) titulo.textContent = 'Tendencias de Venta por Categoría (Último Año)';
+        }
+    } catch (e) {
+        console.error('Error al cargar Reporte de Tendencias/Temporada:', e);
+    }
+}
+
+// Reporte Adicional (Inventario Lento)
+async function cargarReporteInventarioLento() {
+    try {
+        const response = await fetch('/api/reportes/inventario/lento');
+        const data = await response.json();
+        const listaInventario = document.getElementById('reporteRotacion'); // Usando el ID existente
+        
+        if (!listaInventario) return;
+        listaInventario.innerHTML = ''; // Limpiar
+
+        if (data.ok && data.data && data.data.length > 0) {
+            listaInventario.innerHTML = data.data.map(prod => `
+                <div class="item">
+                    <span class="item-title">${prod.nombre}</span>
+                    <span class="item-detail">Precio: $${parseFloat(prod.precio_venta).toFixed(2)} | Última Venta: ${prod.ultima_venta ? new Date(prod.ultima_venta).toLocaleDateString() : 'Nunca'}</span>
+                </div>
+            `).join('');
+        } else {
+            listaInventario.innerHTML = '<div class="item">¡Excelente! Todos los productos han rotado recientemente.</div>';
+        }
+
+    } catch (e) {
+        console.error('Error al cargar Reporte de Inventario Lento:', e);
+    }
+}
+
+// Asegúrate de llamar a prepararReportes en la carga inicial si es el panel de reportes
+document.addEventListener('DOMContentLoaded', function() {
+    // ... tu código existente
+    // ...
+    // Llamada para cargar reportes
+    if (document.getElementById('reportesPanel')) {
+        prepararReportes();
+    }
+    // ...
+});
+

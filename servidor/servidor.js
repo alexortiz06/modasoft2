@@ -1878,6 +1878,39 @@ app.get('/api/clientes/buscar', requiereRol('caja'), async (req, res) => {
   }
 });
 
+// ==================== GESTIÓN DE CLIENTES ====================
+// Rol: Administrador
+app.get('/api/clientes', requiereRol('administrador'), async (req, res) => {
+    try {
+        const [rows] = await pool.query(
+            'SELECT id_cliente, nombre, apellido, email, telefono, direccion FROM clientes ORDER BY id_cliente DESC'
+        );
+        res.json({ ok: true, clientes: rows });
+    } catch (e) {
+        console.error('Error cargando clientes:', e);
+        res.status(500).json({ ok: false, error: 'Error interno del servidor.' });
+    }
+});
+
+app.post('/api/clientes', requiereRol('administrador'), async (req, res) => {
+    const { nombre, apellido, email, telefono, direccion } = req.body;
+    if (!nombre || !email) {
+        return res.status(400).json({ ok: false, error: 'Nombre y Email son requeridos.' });
+    }
+    try {
+        const [result] = await pool.query(
+            'INSERT INTO clientes (nombre, apellido, email, telefono, direccion) VALUES (?, ?, ?, ?, ?)',
+            [nombre, apellido || null, email, telefono || null, direccion || null]
+        );
+        res.json({ ok: true, id_cliente: result.insertId });
+    } catch (e) {
+        console.error('Error creando cliente:', e);
+        res.status(500).json({ ok: false, error: 'Error al crear cliente.' });
+    }
+});
+
+// Implementar PUT y DELETE de forma similar si es necesario.
+
 // Registro de venta simple (AJUSTADO para coincidir con la llamada simple del front-end)
 app.post('/api/caja/venta', requiereRol('caja'), async (req, res) => {
   // Si el front envía un arreglo de items, procesamos la venta completa (con promociones)
@@ -1937,6 +1970,65 @@ app.post('/api/ventas', requiereRol('caja'), async (req, res) => {
   } catch (e) {
     console.error('Error al registrar venta (with promos):', e.message || e);
     res.status(500).json({ ok: false, message: e.message || 'Error al registrar venta' });
+  }
+});
+
+// Registro de venta: endpoint directo para integraciones o llamadas administrativas
+// Rol: cualquiera (Admin o Caja)
+app.post('/api/ventas/registrar', requiereRol('cualquiera'), async (req, res) => {
+  const { id_cliente, id_usuario, total, detalles, tipo_pago } = req.body || {};
+
+  if (!id_usuario || !total || !Array.isArray(detalles) || detalles.length === 0) {
+    return res.status(400).json({ ok: false, error: 'Datos de venta incompletos. Se requieren id_usuario, total y detalles.' });
+  }
+
+  let conn;
+  try {
+    conn = await pool.getConnection();
+    await conn.beginTransaction();
+
+    // Insertar venta (usar fecha_hora consistente con el esquema existente)
+    const [ventaResult] = await conn.query(
+      'INSERT INTO ventas (id_cliente, id_usuario, fecha_hora, total_venta, tipo_pago) VALUES (?, ?, NOW(), ?, ?)',
+      [id_cliente || null, id_usuario, total, tipo_pago || 'Efectivo']
+    );
+    const id_venta = ventaResult.insertId;
+
+    // Insertar detalle y actualizar inventario
+    for (const item of detalles) {
+      const id_producto = Number(item.id_producto || item.id_producto_id || item.producto);
+      const id_talla = item.id_talla || null;
+      const cantidad = Number(item.cantidad || 0);
+      const precio_unitario = Number(item.precio_unitario || item.precio || 0);
+
+      if (!id_producto || !cantidad || cantidad <= 0) {
+        await conn.rollback();
+        conn.release();
+        return res.status(400).json({ ok: false, error: 'Cada detalle requiere id_producto y cantidad válidos.' });
+      }
+
+      await conn.query(
+        'INSERT INTO detalleventa (id_venta, id_producto, id_talla, cantidad, precio_unitario) VALUES (?, ?, ?, ?, ?)',
+        [id_venta, id_producto, id_talla || null, cantidad, precio_unitario]
+      );
+
+      // Restar inventario por talla si aplica
+      if (id_talla) {
+        const [upd] = await conn.query('UPDATE inventario SET cantidad = GREATEST(0, cantidad - ?) WHERE id_producto = ? AND id_talla = ?', [cantidad, id_producto, id_talla]);
+        // Si no existía fila de inventario por talla, no hacemos insert negativo; simplemente actualizamos inventario total abajo
+      }
+
+      // Restar del inventario total del producto
+      await conn.query('UPDATE productos SET inventario = GREATEST(0, inventario - ?) WHERE id_producto = ?', [cantidad, id_producto]);
+    }
+
+    await conn.commit();
+    conn.release();
+    return res.json({ ok: true, message: 'Venta registrada exitosamente', id_venta });
+  } catch (e) {
+    if (conn) { try { await conn.rollback(); conn.release(); } catch (_) {} }
+    console.error('Error registrando venta /api/ventas/registrar:', e.message || e);
+    return res.status(500).json({ ok: false, error: 'Error al registrar la venta.' });
   }
 });
 
@@ -2712,5 +2804,117 @@ app.get('/api/reportes/utilidad-top10', requiereRol('administrador'), async (req
   } catch (e) {
     console.error('Error /api/reportes/utilidad-top10:', e.message || e);
     res.status(500).json({ ok: false, productos: [], error: 'Error del servidor' });
+  }
+});
+
+// ---------------- NUEVOS REPORTES ----------------
+// Todos requieren rol de administrador
+
+// Reporte de Ventas (Totales mensuales)
+app.get('/api/reportes/ventas/mensual', requiereRol('administrador'), async (req, res) => {
+  try {
+    const [rows] = await pool.query(`
+      SELECT 
+        DATE_FORMAT(fecha_hora, '%Y-%m') AS mes,
+        SUM(total_venta) AS total_ventas,
+        COUNT(id_venta) AS num_ventas
+      FROM ventas
+      WHERE fecha_hora >= DATE_SUB(NOW(), INTERVAL 12 MONTH)
+      GROUP BY mes
+      ORDER BY mes ASC
+    `);
+    res.json({ ok: true, data: rows });
+  } catch (e) {
+    console.error('Error Reporte Ventas Mensuales:', e.message || e);
+    res.status(500).json({ ok: false, error: 'Error al generar reporte de ventas.' });
+  }
+});
+
+// Reporte de Compras (Totales mensuales)
+app.get('/api/reportes/compras/mensual', requiereRol('administrador'), async (req, res) => {
+  try {
+    const [rows] = await pool.query(`
+      SELECT 
+        DATE_FORMAT(fecha_compra, '%Y-%m') AS mes,
+        SUM(total_compra) AS total_compras,
+        COUNT(id_compra) AS num_compras
+      FROM compras
+      WHERE fecha_compra >= DATE_SUB(NOW(), INTERVAL 12 MONTH)
+      GROUP BY mes
+      ORDER BY mes ASC
+    `);
+    res.json({ ok: true, data: rows });
+  } catch (e) {
+    console.error('Error Reporte Compras Mensuales:', e.message || e);
+    res.status(500).json({ ok: false, error: 'Error al generar reporte de compras.' });
+  }
+});
+
+// Reporte de Clientes (Top 10 por gasto)
+app.get('/api/reportes/clientes/top', requiereRol('administrador'), async (req, res) => {
+  try {
+    const [rows] = await pool.query(`
+      SELECT 
+        c.id_cliente,
+        c.nombre,
+        c.cedula,
+        COALESCE(SUM(v.total_venta),0) AS gasto_total,
+        COUNT(v.id_venta) AS total_compras
+      FROM clientes c
+      JOIN ventas v ON c.id_cliente = v.id_cliente
+      GROUP BY c.id_cliente, c.nombre, c.cedula
+      ORDER BY gasto_total DESC
+      LIMIT 10
+    `);
+    res.json({ ok: true, data: rows });
+  } catch (e) {
+    console.error('Error Reporte Top Clientes:', e.message || e);
+    res.status(500).json({ ok: false, error: 'Error al generar reporte de clientes.' });
+  }
+});
+
+// Reporte de Temporada/Tendencias (Ventas agrupadas por Categoría en el último año)
+app.get('/api/reportes/tendencias/categorias', requiereRol('administrador'), async (req, res) => {
+  try {
+    const [rows] = await pool.query(`
+      SELECT 
+        cat.nombre AS categoria,
+        SUM(dv.cantidad) AS unidades_vendidas,
+        SUM(dv.cantidad * dv.precio_unitario) AS ingresos_categoria
+      FROM detalleventa dv
+      JOIN productos p ON dv.id_producto = p.id_producto
+      JOIN categorias cat ON p.id_categoria = cat.id_categoria
+      JOIN ventas v ON dv.id_venta = v.id_venta
+      WHERE v.fecha_hora >= DATE_SUB(NOW(), INTERVAL 12 MONTH)
+      GROUP BY cat.nombre
+      ORDER BY ingresos_categoria DESC
+    `);
+    res.json({ ok: true, data: rows });
+  } catch (e) {
+    console.error('Error Reporte Tendencias:', e.message || e);
+    res.status(500).json({ ok: false, error: 'Error al generar reporte de tendencias.' });
+  }
+});
+
+// Reporte Adicional: Rotación de Inventario Lenta (Productos sin venta en 90 días)
+app.get('/api/reportes/inventario/lento', requiereRol('administrador'), async (req, res) => {
+  try {
+    const [rows] = await pool.query(`
+      SELECT 
+        p.id_producto,
+        p.nombre,
+        p.precio_venta,
+        MAX(v.fecha_hora) AS ultima_venta
+      FROM productos p
+      LEFT JOIN detalleventa dv ON p.id_producto = dv.id_producto
+      LEFT JOIN ventas v ON dv.id_venta = v.id_venta
+      GROUP BY p.id_producto
+      HAVING ultima_venta IS NULL OR ultima_venta <= DATE_SUB(NOW(), INTERVAL 90 DAY)
+      ORDER BY ultima_venta ASC
+    `);
+    res.json({ ok: true, data: rows });
+  } catch (e) {
+    console.error('Error Reporte Inventario Lento:', e.message || e);
+    res.status(500).json({ ok: false, error: 'Error al generar reporte de inventario lento.' });
   }
 });
