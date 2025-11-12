@@ -1881,32 +1881,35 @@ app.get('/api/clientes/buscar', requiereRol('caja'), async (req, res) => {
 // ==================== GESTIÓN DE CLIENTES ====================
 // Rol: Administrador
 app.get('/api/clientes', requiereRol('administrador'), async (req, res) => {
-    try {
-        const [rows] = await pool.query(
-            'SELECT id_cliente, nombre, apellido, email, telefono, direccion FROM clientes ORDER BY id_cliente DESC'
-        );
-        res.json({ ok: true, clientes: rows });
-    } catch (e) {
-        console.error('Error cargando clientes:', e);
-        res.status(500).json({ ok: false, error: 'Error interno del servidor.' });
-    }
+  try {
+    // La tabla `clientes` en la base de datos contiene: id_cliente, nombre, cedula, telefono, email
+    // Evitar columnas inexistentes como `apellido` o `direccion` que causan ER_BAD_FIELD_ERROR.
+    const [rows] = await pool.query(
+      'SELECT id_cliente, nombre, cedula, telefono, email FROM clientes ORDER BY id_cliente DESC'
+    );
+    res.json({ ok: true, clientes: rows });
+  } catch (e) {
+    console.error('Error cargando clientes:', e);
+    res.status(500).json({ ok: false, error: 'Error interno del servidor.' });
+  }
 });
 
 app.post('/api/clientes', requiereRol('administrador'), async (req, res) => {
-    const { nombre, apellido, email, telefono, direccion } = req.body;
-    if (!nombre || !email) {
-        return res.status(400).json({ ok: false, error: 'Nombre y Email son requeridos.' });
-    }
-    try {
-        const [result] = await pool.query(
-            'INSERT INTO clientes (nombre, apellido, email, telefono, direccion) VALUES (?, ?, ?, ?, ?)',
-            [nombre, apellido || null, email, telefono || null, direccion || null]
-        );
-        res.json({ ok: true, id_cliente: result.insertId });
-    } catch (e) {
-        console.error('Error creando cliente:', e);
-        res.status(500).json({ ok: false, error: 'Error al crear cliente.' });
-    }
+  // Alinear con la estructura real de la tabla `clientes` en la BD.
+  const { nombre, cedula, telefono, email } = req.body || {};
+  if (!nombre) {
+    return res.status(400).json({ ok: false, error: 'Nombre requerido' });
+  }
+  try {
+    const [result] = await pool.query(
+      'INSERT INTO clientes (nombre, cedula, telefono, email) VALUES (?, ?, ?, ?)',
+      [nombre, cedula || null, telefono || null, email || null]
+    );
+    res.json({ ok: true, id_cliente: result.insertId });
+  } catch (e) {
+    console.error('Error creando cliente:', e);
+    res.status(500).json({ ok: false, error: 'Error al crear cliente.' });
+  }
 });
 
 // Implementar PUT y DELETE de forma similar si es necesario.

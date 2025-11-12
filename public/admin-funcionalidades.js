@@ -1785,18 +1785,18 @@ async function cargarClientesAdmin(busqueda = '') {
 
         if (data.ok && data.clientes && data.clientes.length > 0) {
             // Filtrar en el cliente para el ejemplo (mejor en el servidor)
-            const clientesFiltrados = busqueda
-                ? data.clientes.filter(c =>
-                    c.nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
-                    c.apellido?.toLowerCase().includes(busqueda.toLowerCase()) ||
-                    c.email?.toLowerCase().includes(busqueda.toLowerCase())
-                  )
-                : data.clientes;
+                        const clientesFiltrados = busqueda
+                                ? data.clientes.filter(c =>
+                                        (c.nombre || '').toLowerCase().includes(busqueda.toLowerCase()) ||
+                                        (c.cedula || '').toLowerCase().includes(busqueda.toLowerCase()) ||
+                                        (c.email || '').toLowerCase().includes(busqueda.toLowerCase())
+                                    )
+                                : data.clientes;
 
             listaClientes.innerHTML = clientesFiltrados.map(cliente => `
                 <div class="item">
-                    <span class="item-title">${cliente.nombre} ${cliente.apellido || ''}</span>
-                    <span class="item-detail">${cliente.email} | Tel: ${cliente.telefono || 'N/A'}</span>
+                    <span class="item-title">${cliente.nombre} ${cliente.cedula ? '(' + cliente.cedula + ')' : ''}</span>
+                    <span class="item-detail">${cliente.email || 'N/A'} | Tel: ${cliente.telefono || 'N/A'}</span>
                     <button class="btn btn-sm btn-info" onclick="editarCliente(${cliente.id_cliente})">Editar</button>
                 </div>
             `).join('');
@@ -1936,7 +1936,7 @@ async function cargarReporteTopClientes() {
         if (data.ok && data.data && data.data.length > 0) {
             listaClientes.innerHTML = data.data.map(cliente => `
                 <div class="item">
-                    <span class="item-title">${cliente.nombre} ${cliente.apellido || ''}</span>
+                    <span class="item-title">${cliente.nombre} ${cliente.cedula ? '(' + cliente.cedula + ')' : ''}</span>
                     <span class="item-detail">Gasto: $${parseFloat(cliente.gasto_total).toFixed(2)} (${cliente.total_compras} Compras)</span>
                 </div>
             `).join('');
