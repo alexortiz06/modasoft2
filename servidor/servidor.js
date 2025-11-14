@@ -2364,8 +2364,6 @@ app.get('/api/reportes/compras-periodo', requiereRol('administrador'), async (re
     const start = req.query.start || null;
     const end = req.query.end || null;
     
-    console.log('📊 Reporte de compras solicitado - Período:', { start, end });
-    
     let query = `
       SELECT 
         c.id_compra,
@@ -2389,22 +2387,15 @@ app.get('/api/reportes/compras-periodo', requiereRol('administrador'), async (re
     if (start) {
       query += ' AND DATE(c.fecha_compra) >= ?';
       params.push(start);
-      console.log('  - Fecha inicio:', start);
     }
     if (end) {
       query += ' AND DATE(c.fecha_compra) <= ?';
       params.push(end);
-      console.log('  - Fecha fin:', end);
     }
     
     query += ' ORDER BY c.fecha_compra DESC, c.id_compra, dc.id_producto';
     
-    console.log('  - Query:', query);
-    console.log('  - Parámetros:', params);
-    
     const [rows] = await pool.query(query, params);
-    
-    console.log('  - Filas obtenidas de la BD:', rows.length);
 
     // Agrupar por proveedor > compra > líneas
     const grupos = {};
@@ -2446,10 +2437,6 @@ app.get('/api/reportes/compras-periodo', requiereRol('administrador'), async (re
       }
     });
     
-    console.log('  - Compras agrupadas:', comprasCount);
-    console.log('  - Proveedores únicos:', Object.keys(grupos).length);
-    console.log('  - Total general calculado: $' + totalGeneral.toFixed(2));
-    
     res.json({ 
       ok: true, 
       grupos: Object.values(grupos), 
@@ -2457,11 +2444,9 @@ app.get('/api/reportes/compras-periodo', requiereRol('administrador'), async (re
       compras_count: comprasCount
     });
   } catch (e) {
-    console.error('❌ Error /api/reportes/compras-periodo:', e.message || e);
-    console.error('   Stack:', e.stack);
-    res.status(500).json({ 
-      ok: false, 
-      grupos: [], 
+    res.status(500).json({
+      ok: false,
+      grupos: [],
       error: 'Error del servidor: ' + e.message,
       compras_count: 0
     });
