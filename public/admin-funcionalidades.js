@@ -1212,36 +1212,57 @@ async function renderReporteCompras() {
             cont.innerHTML = '<div class="item">No hay compras en el periodo seleccionado.</div>';
             return;
         }
-        // Construir tabla plana con filas por compra
-        let html = `<table style="width:100%;border-collapse:collapse;">
-            <thead>
-              <tr style="background:var(--surface-alt);">
-                <th style="padding:8px;text-align:left;border:1px solid #eee;">Proveedor</th>
-                <th style="padding:8px;text-align:left;border:1px solid #eee;">ID Compra</th>
-                <th style="padding:8px;text-align:left;border:1px solid #eee;">Fecha</th>
-                <th style="padding:8px;text-align:left;border:1px solid #eee;">Producto</th>
-                <th style="padding:8px;text-align:right;border:1px solid #eee;">Cantidad</th>
-                <th style="padding:8px;text-align:right;border:1px solid #eee;">Costo Unit.</th>
-                <th style="padding:8px;text-align:right;border:1px solid #eee;">Total Línea</th>
-              </tr>
-            </thead>
-            <tbody>`;
+        // Construir vista agrupada por proveedor > compra, con totales por compra y total general
+        let html = '';
         data.grupos.forEach(g => {
-            (g.compras||[]).forEach(c => {
-                html += `<tr>
-                    <td style="padding:8px;border:1px solid #f4f4f4;">${g.proveedor}</td>
-                    <td style="padding:8px;border:1px solid #f4f4f4;">${c.id_compra}</td>
-                    <td style="padding:8px;border:1px solid #f4f4f4;">${c.fecha_compra}</td>
-                    <td style="padding:8px;border:1px solid #f4f4f4;">${(c.marca||'') + ' ' + (c.producto||('Producto #' + (c.id_producto||'')))}</td>
-                    <td style="padding:8px;text-align:right;border:1px solid #f4f4f4;">${Number(c.cantidad||0)}</td>
-                    <td style="padding:8px;text-align:right;border:1px solid #f4f4f4;">$${Number(c.costo_unitario||0).toFixed(2)}</td>
-                    <td style="padding:8px;text-align:right;border:1px solid #f4f4f4;">$${Number(c.total_linea||0).toFixed(2)}</td>
-                </tr>`;
+            html += `<div style="margin-bottom:18px;">
+                <h4 style="margin:6px 0;">Proveedor: ${g.proveedor || 'Sin proveedor'}</h4>`;
+
+            // Agrupar las líneas por id_compra para mostrar subtotal por compra
+            const comprasById = {};
+            (g.compras || []).forEach(line => {
+                const id = line.id_compra;
+                if (!comprasById[id]) comprasById[id] = { id_compra: id, fecha_compra: line.fecha_compra, lineas: [], subtotal: 0 };
+                comprasById[id].lineas.push(line);
+                comprasById[id].subtotal += Number(line.total_linea || 0);
             });
+
+            // Mostrar cada compra bajo este proveedor
+            Object.values(comprasById).forEach(compra => {
+                html += `<div style="border:1px solid var(--surface-alt);padding:12px;border-radius:8px;margin:8px 0;background:#fff;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                        <div><strong>Compra #${compra.id_compra}</strong><br><small>Fecha: ${compra.fecha_compra}</small></div>
+                        <div style="font-weight:700;">Subtotal: $${compra.subtotal.toFixed(2)}</div>
+                    </div>
+                    <div style="overflow-x:auto;">
+                        <table style="width:100%;border-collapse:collapse;">
+                            <thead>
+                                <tr style="background:var(--surface-alt);">
+                                    <th style="padding:8px;text-align:left;border:1px solid #eee;">Producto</th>
+                                    <th style="padding:8px;text-align:right;border:1px solid #eee;">Cantidad</th>
+                                    <th style="padding:8px;text-align:right;border:1px solid #eee;">Costo Unit.</th>
+                                    <th style="padding:8px;text-align:right;border:1px solid #eee;">Total Línea</th>
+                                </tr>
+                            </thead>
+                            <tbody>`;
+
+                compra.lineas.forEach(l => {
+                    html += `<tr>
+                        <td style="padding:8px;border:1px solid #f4f4f4;">${(l.marca||'') + ' ' + (l.producto||('Producto #' + (l.id_producto||'')))}</td>
+                        <td style="padding:8px;text-align:right;border:1px solid #f4f4f4;">${Number(l.cantidad||0)}</td>
+                        <td style="padding:8px;text-align:right;border:1px solid #f4f4f4;">$${Number(l.costo_unitario||0).toFixed(2)}</td>
+                        <td style="padding:8px;text-align:right;border:1px solid #f4f4f4;">$${Number(l.total_linea||0).toFixed(2)}</td>
+                    </tr>`;
+                });
+
+                html += `</tbody></table></div></div>`;
+            });
+
+            html += `</div>`;
         });
-        html += `</tbody></table>`;
+
         // Total general
-        html += `<div style="margin-top:12px;font-weight:700;">Total general: $${Number(data.total_general||0).toFixed(2)}</div>`;
+        html += `<div style="margin-top:12px;font-weight:700;font-size:1.05em;">Total general: $${Number(data.total_general||0).toFixed(2)}</div>`;
         cont.innerHTML = html;
     } catch (e) {
         cont.innerHTML = '<div class="item">Error al cargar compras.</div>';

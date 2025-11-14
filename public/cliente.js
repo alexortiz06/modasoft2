@@ -506,7 +506,22 @@ document.addEventListener('DOMContentLoaded', () => {
                 const data = await res.json();
                 if (data.ok) {
                     formCategoria.reset();
-                    cargarCategorias();
+                    // Recargar categorías en el catálogo
+                    await cargarCategorias();
+                    // Además actualizar otros componentes que dependen de categorías
+                    // (productos, formularios de compra y opciones de promoción)
+                    try {
+                        if (typeof cargarProductos === 'function') cargarProductos();
+                    } catch (e) { /* ignore */ }
+                    try {
+                        if (typeof cargarProductosCompra === 'function') cargarProductosCompra();
+                    } catch (e) { /* ignore */ }
+                    try {
+                        if (typeof cargarOpcionesPromocionForm === 'function') cargarOpcionesPromocionForm();
+                    } catch (e) { /* ignore */ }
+                    try {
+                        if (typeof cargarProductosCaja === 'function') cargarProductosCaja();
+                    } catch (e) { /* ignore */ }
                 } else {
                     alert('Error al crear categoría');
                 }
