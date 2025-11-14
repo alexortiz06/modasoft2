@@ -2453,6 +2453,61 @@ app.get('/api/reportes/compras-periodo', requiereRol('administrador'), async (re
   }
 });
 
+// Endpoint: Reporte de ventas por período (para gráficas y reportes)
+app.get('/api/reportes/ventas-periodo', requiereRol('administrador'), async (req, res) => {
+  try {
+    const start = req.query.start || null;
+    const end = req.query.end || null;
+    
+    let query = `
+      SELECT 
+        v.id_venta,
+        v.fecha_hora,
+        v.total_venta,
+        v.tipo_pago,
+        c.nombre AS cliente,
+        u.usuario AS vendedor
+      FROM ventas v
+      LEFT JOIN clientes c ON v.id_cliente = c.id_cliente
+      LEFT JOIN usuarios u ON v.id_usuario = u.id_usuario
+      WHERE 1=1
+    `;
+    const params = [];
+    
+    if (start) {
+      query += ' AND DATE(v.fecha_hora) >= ?';
+      params.push(start);
+    }
+    if (end) {
+      query += ' AND DATE(v.fecha_hora) <= ?';
+      params.push(end);
+    }
+    
+    query += ' ORDER BY v.fecha_hora DESC';
+    
+    const [ventas] = await pool.query(query, params);
+    
+    let totalGeneral = 0;
+    ventas.forEach(v => {
+      totalGeneral += Number(v.total_venta || 0);
+    });
+    
+    res.json({
+      ok: true,
+      ventas: ventas || [],
+      total_general: totalGeneral,
+      ventas_count: ventas.length
+    });
+  } catch (e) {
+    res.status(500).json({
+      ok: false,
+      ventas: [],
+      error: 'Error del servidor: ' + e.message,
+      ventas_count: 0
+    });
+  }
+});
+
 // ==================== CUENTAS POR PAGAR ====================
 // Endpoint para obtener cuentas por pagar desde compras
 app.get('/api/cuentas-pagar', requiereRol('administrador'), async (req, res) => {

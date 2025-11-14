@@ -1635,14 +1635,15 @@
                 <!-- Reporte: Ventas -->
                 <div id="reporte-ventas" class="reporte-section" style="display:none;">
                     <div class="chart-container">
-                        <div class="chart-header">
-                            <h4 class="chart-title">Listado de Ventas</h4>
-                        </div>
-                        <div class="list-search">
-                            <input id="buscarVenta" placeholder="Buscar ventas..." class="input" type="text">
+                        <div class="chart-header" style="gap:10px;display:flex;align-items:center;flex-wrap:wrap;">
+                            <h4 class="chart-title">Reporte de Ventas por Período</h4>
+                            <input type="date" id="ventasFechaInicio" class="input" style="width:auto;"/>
+                            <span>a</span>
+                            <input type="date" id="ventasFechaFin" class="input" style="width:auto;"/>
+                            <button id="btnReporteVentas" class="btn secondary">🔄 Generar</button>
                         </div>
                         <div id="reporteVentas" class="list">
-                            <div class="item">Cargando ventas recientes...</div>
+                            <div class="item">Selecciona fechas y pulsa "Generar".</div>
                         </div>
                     </div>
                 </div>
@@ -1701,6 +1702,6 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
     <script src="cliente.js"></script>
     <script src="admin-funcionalidades.js"></script>
-    <script src="reporte-compras-final.js"></script>
+    <script src="reporte-ventas-simple.js"></script>
 </body>
 </html>

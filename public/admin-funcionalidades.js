@@ -1711,6 +1711,20 @@ function attachReportListeners(){
         console.log('✗ btnReporteCompras no encontrado');
     }
 
+    // Listener para botón de reporte de ventas
+    const btnReporteVentas = document.getElementById('btnReporteVentas');
+    if (btnReporteVentas) {
+        console.log('✓ Encontrado btnReporteVentas');
+        btnReporteVentas.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            console.log('Click en btnReporteVentas - iniciando renderReporteVentas');
+            renderReporteVentas();
+        });
+    } else {
+        console.log('✗ btnReporteVentas no encontrado');
+    }
+
     // Listener para select de temporada (en reportes)
     const selectTemporada = document.getElementById('selectTemporada');
     if (selectTemporada) {
