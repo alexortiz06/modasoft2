@@ -1239,320 +1239,102 @@ async function renderReporteInventario() {
 }
 
 async function renderReporteCompras() {
-    console.log('🔄 renderReporteCompras iniciado');
     const cont = document.getElementById('reporteCompras');
-    if (!cont) {
-        console.error('❌ No se encontró elemento reporteCompras');
-        return;
-    }
-    
-    console.log('📝 Mostrando mensaje de carga');
+    if (!cont) return;
     cont.innerHTML = '<div class="item">Cargando compras...</div>';
-    
-    const btn = document.getElementById('btnReporteCompras');
-    if (btn) {
-        try { btn.dataset._origText = btn.textContent; } catch(e){}
-        btn.disabled = true;
-        btn.textContent = 'Generando...';
-    }
-    
     try {
-        const fi = document.getElementById('comprasFechaInicio')?.value || '';
-        const ff = document.getElementById('comprasFechaFin')?.value || '';
-        console.log('📅 Fechas ingresadas:', { inicio: fi, fin: ff });
-        
-        // Validar que al menos una fecha esté presente
-        if (!fi && !ff) {
-            console.warn('⚠️ No se especificaron fechas - se traerán todas las compras');
-        }
-        
-        const qs = new URLSearchParams();
-        if (fi) {
-            qs.set('start', fi);
-            console.log('  ✓ Fecha inicio establecida:', fi);
-        }
-        if (ff) {
-            qs.set('end', ff);
-            console.log('  ✓ Fecha fin establecida:', ff);
-        }
-        
-        const url = '/api/reportes/compras-periodo' + (qs.toString() ? ('?' + qs.toString()) : '');
-        console.log('🌐 Solicitando URL:', url);
-        
-        const res = await fetch(url, { credentials: 'include' });
-        console.log('✓ Respuesta recibida, status:', res.status, res.statusText);
-        
-        if (!res.ok) {
-            let msg = `Error al solicitar datos (status ${res.status} ${res.statusText}).`;
-            try {
-                const j = await res.clone().json();
-                if (j && (j.error || j.message)) {
-                    msg += ' ' + (j.error || j.message);
-                }
-            } catch (_) {
-                try {
-                    const txt = await res.text();
-                    if (txt) msg += ' ' + txt;
-                } catch (_) {}
-            }
-            console.error('❌ Error fetching compras-periodo:', res.status, msg);
-            cont.innerHTML = `<div class="item">❌ ${msg}</div>`;
+        const res = await fetch('/api/compras');
+        const data = await res.json();
+        if (!data.ok || !data.compras || data.compras.length === 0) {
+            cont.innerHTML = '<div class="item">No hay datos de compras.</div>';
             return;
         }
-        
-        const data = await res.json().catch(err => {
-            console.error('❌ JSON parse error for compras-periodo:', err);
-            return null;
+        // Construir tabla
+        let html = `<table style="width:100%;border-collapse:collapse;">
+            <thead>
+              <tr style="background:var(--surface-alt);">
+                <th style="padding:8px;text-align:left;border:1px solid #eee;">Compra #</th>
+                <th style="padding:8px;text-align:left;border:1px solid #eee;">Fecha</th>
+                <th style="padding:8px;text-align:left;border:1px solid #eee;">Proveedor</th>
+                <th style="padding:8px;text-align:right;border:1px solid #eee;">Total</th>
+              </tr>
+            </thead>
+            <tbody>`;
+        data.compras.forEach(c => {
+            html += `<tr>
+                <td style="padding:8px;border:1px solid #f4f4f4;">#${c.id_compra}</td>
+                <td style="padding:8px;border:1px solid #f4f4f4;">${new Date(c.fecha_compra).toLocaleDateString('es-VE')}</td>
+                <td style="padding:8px;border:1px solid #f4f4f4;">${c.proveedor || 'N/A'}</td>
+                <td style="padding:8px;text-align:right;border:1px solid #f4f4f4;font-weight:bold;">$${Number(c.total_compra || 0).toFixed(2)}</td>
+            </tr>`;
         });
-        
-        console.log('📊 Datos recibidos:', data);
-        
-        if (!data) {
-            cont.innerHTML = '<div class="item">❌ Error: No se pudo parsear la respuesta del servidor</div>';
-            return;
-        }
-        
-        if (!data.ok) {
-            cont.innerHTML = `<div class="item">❌ Error: ${data.error || 'Error desconocido'}</div>`;
-            console.error('Error en respuesta:', data.error);
-            return;
-        }
-        
-        if (!data.grupos || data.grupos.length === 0) {
-            cont.innerHTML = '<div class="item">ℹ️ No hay compras en el período seleccionado (4 Nov - 13 Nov). Verifica que las compras existan en esas fechas.</div>';
-            console.log('Sin datos de compras en el período');
-            return;
-        }
-        
-        console.log('✓ Procesando', data.grupos.length, 'grupos de proveedores');
-        
-        // Construir vista agrupada por proveedor > compra, con totales por compra y total general
-        let html = '';
-        data.grupos.forEach((g, idx) => {
-            console.log(`  Proveedor ${idx + 1}:`, g.proveedor, '- Compras:', g.compras?.length || 0);
-            html += `<div style="margin-bottom:18px;">
-                <h4 style="margin:6px 0;">📦 Proveedor: ${g.proveedor || 'Sin proveedor'}</h4>`;
-
-            // Iterar sobre compras bajo este proveedor
-            if (g.compras && g.compras.length > 0) {
-                console.log('  ✓ Total compras de este proveedor:', g.compras.length);
-                g.compras.forEach(compra => {
-                    // Calcular subtotal de esta compra
-                    const subtotal = (compra.lineas && compra.lineas.length > 0)
-                        ? compra.lineas.reduce((sum, l) => sum + (Number(l.total_linea || 0)), 0)
-                        : Number(compra.total_compra || 0);
-                    
-                    html += `<div style="border:1px solid var(--surface-alt);padding:12px;border-radius:8px;margin:8px 0;background:#fff;">
-                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-                            <div><strong>Compra #${compra.id_compra}</strong><br><small>Fecha: ${compra.fecha_compra}</small></div>
-                            <div style="font-weight:700;">Subtotal: $${subtotal.toFixed(2)}</div>
-                        </div>`;
-                    
-                    // Mostrar tabla de líneas si existen
-                    if (compra.lineas && compra.lineas.length > 0) {
-                        html += `<div style="overflow-x:auto;">
-                            <table style="width:100%;border-collapse:collapse;">
-                                <thead>
-                                    <tr style="background:var(--surface-alt);">
-                                        <th style="padding:8px;text-align:left;border:1px solid #eee;">Producto</th>
-                                        <th style="padding:8px;text-align:right;border:1px solid #eee;">Cantidad</th>
-                                        <th style="padding:8px;text-align:right;border:1px solid #eee;">Costo Unit.</th>
-                                        <th style="padding:8px;text-align:right;border:1px solid #eee;">Total Línea</th>
-                                    </tr>
-                                </thead>
-                                <tbody>`;
-                        
-                        compra.lineas.forEach(l => {
-                            html += `<tr>
-                                <td style="padding:8px;border:1px solid #f4f4f4;">${(l.marca||'') + (l.marca ? ' ' : '') + (l.producto||('Producto #' + (l.id_producto||'')))}</td>
-                                <td style="padding:8px;text-align:right;border:1px solid #f4f4f4;">${Number(l.cantidad||0)}</td>
-                                <td style="padding:8px;text-align:right;border:1px solid #f4f4f4;">$${Number(l.costo_unitario||0).toFixed(2)}</td>
-                                <td style="padding:8px;text-align:right;border:1px solid #f4f4f4;">$${Number(l.total_linea||0).toFixed(2)}</td>
-                            </tr>`;
-                        });
-                        
-                        html += `</tbody></table></div>`;
-                    } else {
-                        html += `<div style="padding:8px;color:#999;font-style:italic;">Sin líneas de detalle</div>`;
-                    }
-                    
-                    html += `</div>`;
-                });
-            } else {
-                html += `<div style="padding:8px;color:#999;font-style:italic;">Sin compras para este proveedor</div>`;
-            }
-
-            html += `</div>`;
-        });
-
-        // Total general
-        const totalGeneral = Number(data.total_general || 0);
-        html += `<div style="margin-top:12px;font-weight:700;font-size:1.05em;">💰 Total general: $${totalGeneral.toFixed(2)}</div>`;
-        
-        console.log('✅ Renderizando HTML en contenedor');
+        html += `</tbody></table>`;
         cont.innerHTML = html;
-        console.log('✅ Reporte de compras generado exitosamente');
     } catch (e) {
-        console.error('❌ Error renderReporteCompras:', e);
-        console.error('   Stack:', e.stack);
-        cont.innerHTML = '<div class="item">❌ Error al cargar compras: ' + e.message + '</div>';
-    } finally {
-        if (btn) {
-            btn.disabled = false;
-            try { btn.textContent = btn.dataset._origText || '🔄 Generar'; } catch(e) { btn.textContent = '🔄 Generar'; }
-            try { delete btn.dataset._origText; } catch(e){}
-        }
+        cont.innerHTML = '<div class="item">Error al cargar compras.</div>';
     }
 }
 
 // ------------------ Análisis de Ventas por Temporada (frontend helper) ------------------
-async function fetchVentasTemporada(periodo = 'actual') {
-    // Buscar canvas en dashboard o en reportes
-    let canvas = document.getElementById('temporadaChart');
-    if (!canvas) {
-        canvas = document.getElementById('temporadaChartReportes');
-    }
+async function renderReporteTemporada() {
     const cont = document.getElementById('reporteTemporada');
-    
-    if (!canvas) {
-        console.log('Canvas temporadaChart no encontrado');
-        if (cont) {
-            cont.innerHTML = '<div class="item">Error: Canvas no encontrado</div>';
-        }
-        return;
-    }
-    
+    if (!cont) return;
+    cont.innerHTML = '<div class="item">Cargando análisis de ventas...</div>';
     try {
-        // Mapear periodo a formato correcto
-        let periodoQuery = periodo;
-        if (periodo === 'actual') {
-            periodoQuery = 'actual';
-        } else if (periodo === 'anterior') {
-            periodoQuery = 'anterior';
-        }
-        
-        const res = await fetch(`/api/reportes/ventas-temporada?periodo=${encodeURIComponent(periodoQuery)}`);
+        const res = await fetch('/api/admin/ventas');
         const data = await res.json();
-        if (!data || !data.rows || data.rows.length === 0) {
-            if (cont) {
-                cont.innerHTML = '<div class="item">No hay datos de ventas por temporada.</div>';
-            }
-            console.log('No hay datos de ventas por temporada');
+        if (!data.ok || !data.ventas || data.ventas.length === 0) {
+            cont.innerHTML = '<div class="item">No hay datos de ventas.</div>';
             return;
         }
-
-        // Crear gráfico con Chart.js
-        if (canvas && typeof Chart !== 'undefined') {
-            const ctx = canvas.getContext('2d');
-            const labels = data.rows.map(r => r.periodo || (r.anio && r.mes ? `${r.anio}-${String(r.mes).padStart(2,'0')}` : 'N/A'));
-            const ingresos = data.rows.map(r => Number(r.ingreso_total || 0));
-            const unidades = data.rows.map(r => Number(r.unidades_vendidas || 0));
-            
-            // Destruir gráfico anterior si existe
-            if (window.temporadaChartInstance) {
-                window.temporadaChartInstance.destroy();
-            }
-            
-            window.temporadaChartInstance = new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: labels,
-                    datasets: [
-                        {
-                            label: 'Ingresos ($)',
-                            data: ingresos,
-                            borderColor: 'rgb(37, 99, 235)',
-                            backgroundColor: 'rgba(37, 99, 235, 0.1)',
-                            yAxisID: 'y',
-                            tension: 0.4
-                        },
-                        {
-                            label: 'Unidades Vendidas',
-                            data: unidades,
-                            borderColor: 'rgb(16, 185, 129)',
-                            backgroundColor: 'rgba(16, 185, 129, 0.1)',
-                            yAxisID: 'y1',
-                            tension: 0.4
-                        }
-                    ]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    interaction: {
-                        mode: 'index',
-                        intersect: false,
-                    },
-                    plugins: {
-                        legend: {
-                            display: true,
-                            position: 'top'
-                        },
-                        title: {
-                            display: true,
-                            text: 'Análisis de Ventas por Temporada',
-                            font: {
-                                size: 16,
-                                weight: 'bold'
-                            }
-                        },
-                        tooltip: {
-                            callbacks: {
-                                label: function(context) {
-                                    if (context.datasetIndex === 0) {
-                                        return 'Ingresos: $' + context.parsed.y.toFixed(2);
-                                    } else {
-                                        return 'Unidades: ' + context.parsed.y;
-                                    }
-                                }
-                            }
-                        }
-                    },
-                    scales: {
-                        y: {
-                            type: 'linear',
-                            display: true,
-                            position: 'left',
-                            beginAtZero: true,
-                            ticks: {
-                                callback: function(value) {
-                                    return '$' + value.toFixed(2);
-                                }
-                            },
-                            title: {
-                                display: true,
-                                text: 'Ingresos ($)'
-                            }
-                        },
-                        y1: {
-                            type: 'linear',
-                            display: true,
-                            position: 'right',
-                            beginAtZero: true,
-                            grid: {
-                                drawOnChartArea: false,
-                            },
-                            title: {
-                                display: true,
-                                text: 'Unidades Vendidas'
-                            }
-                        }
-                    }
-                }
-            });
-        }
         
-        // El gráfico ya se creó en el canvas encontrado arriba
+        // Agrupar por mes
+        const ventasPorMes = {};
+        let totalGeneral = 0;
+        
+        data.ventas.forEach(v => {
+            const fecha = new Date(v.fecha_hora);
+            const mes = fecha.toLocaleDateString('es-VE', { month: 'long', year: 'numeric' });
+            const monto = Number(v.total_venta || 0);
+            
+            if (!ventasPorMes[mes]) {
+                ventasPorMes[mes] = { count: 0, total: 0 };
+            }
+            ventasPorMes[mes].count++;
+            ventasPorMes[mes].total += monto;
+            totalGeneral += monto;
+        });
+        
+        // Construir tabla
+        let html = `<table style="width:100%;border-collapse:collapse;">
+            <thead>
+              <tr style="background:var(--surface-alt);">
+                <th style="padding:8px;text-align:left;border:1px solid #eee;">Período</th>
+                <th style="padding:8px;text-align:right;border:1px solid #eee;">Transacciones</th>
+                <th style="padding:8px;text-align:right;border:1px solid #eee;">Total Vendido</th>
+              </tr>
+            </thead>
+            <tbody>`;
+        
+        Object.entries(ventasPorMes).forEach(([mes, datos]) => {
+            html += `<tr>
+                <td style="padding:8px;border:1px solid #f4f4f4;">${mes}</td>
+                <td style="padding:8px;text-align:right;border:1px solid #f4f4f4;">${datos.count}</td>
+                <td style="padding:8px;text-align:right;border:1px solid #f4f4f4;font-weight:bold;">$${datos.total.toFixed(2)}</td>
+            </tr>`;
+        });
+        
+        html += `</tbody></table>`;
+        html += `<div style="padding:15px;background:#f0f0f0;margin-top:15px;border-radius:4px;font-weight:bold;">Total: $${totalGeneral.toFixed(2)}</div>`;
+        
+        cont.innerHTML = html;
     } catch (e) {
-        console.error('Error obteniendo ventas por temporada:', e);
-        if (cont) {
-            cont.innerHTML = '<div class="item">Error al cargar ventas por temporada.</div>';
-        }
+        cont.innerHTML = '<div class="item">Error al cargar análisis de ventas.</div>';
     }
 }
 
-// ------------------ Rotación de Inventario (frontend helper) ------------------
-async function cargarRotacionInventario() {
+// ==================== ROTACIÓN DE INVENTARIO ====================
+async function renderReporteRotacion() {
     const cont = document.getElementById('reporteRotacion');
     if (!cont) return;
     cont.innerHTML = '<div class="item">Cargando rotación de inventario...</div>';
@@ -1588,6 +1370,44 @@ async function cargarRotacionInventario() {
     } catch (e) {
         console.error('Error al obtener rotación de inventario:', e);
         cont.innerHTML = '<div class="item">Error al cargar rotación de inventario.</div>';
+    }
+}
+
+// ==================== REPORTE DE CLIENTES ====================
+async function renderReporteClientes() {
+    const cont = document.getElementById('reporteClientes');
+    if (!cont) return;
+    cont.innerHTML = '<div class="item">Cargando clientes...</div>';
+    try {
+        const res = await fetch('/api/clientes');
+        const data = await res.json();
+        if (!data.ok || !data.clientes || data.clientes.length === 0) {
+            cont.innerHTML = '<div class="item">No hay datos de clientes.</div>';
+            return;
+        }
+        // Construir tabla
+        let html = `<table style="width:100%;border-collapse:collapse;">
+            <thead>
+              <tr style="background:var(--surface-alt);">
+                <th style="padding:8px;text-align:left;border:1px solid #eee;">Nombre</th>
+                <th style="padding:8px;text-align:left;border:1px solid #eee;">Cédula</th>
+                <th style="padding:8px;text-align:left;border:1px solid #eee;">Email</th>
+                <th style="padding:8px;text-align:left;border:1px solid #eee;">Teléfono</th>
+              </tr>
+            </thead>
+            <tbody>`;
+        data.clientes.forEach(c => {
+            html += `<tr>
+                <td style="padding:8px;border:1px solid #f4f4f4;">${c.nombre || 'N/A'}</td>
+                <td style="padding:8px;border:1px solid #f4f4f4;">${c.cedula || 'N/A'}</td>
+                <td style="padding:8px;border:1px solid #f4f4f4;">${c.email || 'N/A'}</td>
+                <td style="padding:8px;border:1px solid #f4f4f4;">${c.telefono || 'N/A'}</td>
+            </tr>`;
+        });
+        html += `</tbody></table>`;
+        cont.innerHTML = html;
+    } catch (e) {
+        cont.innerHTML = '<div class="item">Error al cargar clientes.</div>';
     }
 }
 
@@ -1725,20 +1545,46 @@ function attachReportListeners(){
         console.log('✗ btnReporteVentas no encontrado');
     }
 
-    // Listener para select de temporada (en reportes)
-    const selectTemporada = document.getElementById('selectTemporada');
-    if (selectTemporada) {
-        selectTemporada.addEventListener('change', function() {
-            fetchVentasTemporada(this.value);
+    // Listener para botón de reporte de clientes
+    const btnReporteClientes = document.getElementById('btnReporteClientes');
+    if (btnReporteClientes) {
+        console.log('✓ Encontrado btnReporteClientes');
+        btnReporteClientes.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            console.log('Click en btnReporteClientes - iniciando renderReporteClientes');
+            renderReporteClientes();
         });
+    } else {
+        console.log('✗ btnReporteClientes no encontrado');
     }
 
-    // Listener para select de temporada (en dashboard)
-    const selectTemporadaDashboard = document.getElementById('selectTemporadaDashboard');
-    if (selectTemporadaDashboard) {
-        selectTemporadaDashboard.addEventListener('change', function() {
-            fetchVentasTemporada(this.value);
+    // Listener para botón de reporte de temporada
+    const btnReporteTemporada = document.getElementById('btnReporteTemporada');
+    if (btnReporteTemporada) {
+        console.log('✓ Encontrado btnReporteTemporada');
+        btnReporteTemporada.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            console.log('Click en btnReporteTemporada - iniciando renderReporteTemporada');
+            renderReporteTemporada();
         });
+    } else {
+        console.log('✗ btnReporteTemporada no encontrado');
+    }
+
+    // Listener para botón de reporte de rotación
+    const btnReporteRotacion = document.getElementById('btnReporteRotacion');
+    if (btnReporteRotacion) {
+        console.log('✓ Encontrado btnReporteRotacion');
+        btnReporteRotacion.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            console.log('Click en btnReporteRotacion - iniciando renderReporteRotacion');
+            renderReporteRotacion();
+        });
+    } else {
+        console.log('✗ btnReporteRotacion no encontrado');
     }
 
     // Listener para búsqueda de ventas
@@ -1749,14 +1595,6 @@ function attachReportListeners(){
         });
     }
 
-    // Listener para búsqueda de clientes
-    const buscarCliente = document.getElementById('buscarCliente');
-    if (buscarCliente) {
-        buscarCliente.addEventListener('input', function() {
-            cargarClientes(this.value);
-        });
-    }
-
     // Cargar datos iniciales cuando se muestran los reportes
     setTimeout(() => {
         const reportesPanel = document.getElementById('reportesPanel');
@@ -1764,18 +1602,6 @@ function attachReportListeners(){
             const tabUtilidad = document.getElementById('tab-utilidad');
             if (tabUtilidad && tabUtilidad.classList.contains('active')) {
                 cargarReporteUtilidad();
-            }
-            const tabVentas = document.getElementById('tab-ventas');
-            if (tabVentas && tabVentas.classList.contains('active')) {
-                cargarVentasAdmin();
-            }
-            const tabClientes = document.getElementById('tab-clientes');
-            if (tabClientes && tabClientes.classList.contains('active')) {
-                cargarClientes();
-            }
-            const tabTemporada = document.getElementById('tab-temporada');
-            if (tabTemporada && tabTemporada.classList.contains('active')) {
-                fetchVentasTemporada('actual');
             }
         }
     }, 500);

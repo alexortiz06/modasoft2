@@ -1619,15 +1619,12 @@
                 <!-- Reporte: Compras -->
                 <div id="reporte-compras" class="reporte-section" style="display:none;">
                     <div class="chart-container">
-                        <div class="chart-header" style="gap:10px;display:flex;align-items:center;flex-wrap:wrap;">
-                            <h4 class="chart-title">Reporte de Compras por Periodo</h4>
-                            <input type="date" id="comprasFechaInicio" class="input" style="width:auto;"/>
-                            <span>a</span>
-                            <input type="date" id="comprasFechaFin" class="input" style="width:auto;"/>
+                        <div class="chart-header">
+                            <h4 class="chart-title">Reporte de Compras</h4>
                             <button id="btnReporteCompras" class="btn secondary">🔄 Generar</button>
                         </div>
                         <div id="reporteCompras" class="list">
-                            <div class="item">Selecciona fechas (opcional) y pulsa "Generar".</div>
+                            <div class="item">Pulsa "Generar" para ver el reporte de compras.</div>
                         </div>
                     </div>
                 </div>
@@ -1635,15 +1632,12 @@
                 <!-- Reporte: Ventas -->
                 <div id="reporte-ventas" class="reporte-section" style="display:none;">
                     <div class="chart-container">
-                        <div class="chart-header" style="gap:10px;display:flex;align-items:center;flex-wrap:wrap;">
-                            <h4 class="chart-title">Reporte de Ventas por Período</h4>
-                            <input type="date" id="ventasFechaInicio" class="input" style="width:auto;"/>
-                            <span>a</span>
-                            <input type="date" id="ventasFechaFin" class="input" style="width:auto;"/>
+                        <div class="chart-header">
+                            <h4 class="chart-title">Resumen de Ventas</h4>
                             <button id="btnReporteVentas" class="btn secondary">🔄 Generar</button>
                         </div>
                         <div id="reporteVentas" class="list">
-                            <div class="item">Selecciona fechas y pulsa "Generar".</div>
+                            <div class="item">Pulsa "Generar" para ver el resumen de ventas.</div>
                         </div>
                     </div>
                 </div>
@@ -1653,12 +1647,10 @@
                     <div class="chart-container">
                         <div class="chart-header">
                             <h4 class="chart-title">Listado de Clientes</h4>
-                        </div>
-                        <div class="list-search">
-                            <input id="buscarCliente" placeholder="Buscar clientes..." class="input" type="text">
+                            <button id="btnReporteClientes" class="btn secondary">🔄 Generar</button>
                         </div>
                         <div id="reporteClientes" class="list">
-                            <div class="item">Cargando lista de clientes...</div>
+                            <div class="item">Pulsa "Generar" para ver el listado de clientes.</div>
                         </div>
                     </div>
                 </div>
@@ -1667,18 +1659,11 @@
                 <div id="reporte-temporada" class="reporte-section" style="display:none;">
                     <div class="chart-container">
                         <div class="chart-header">
-                            <h4 class="chart-title">Análisis de Ventas por Temporada</h4>
-                            <select id="selectTemporada" class="input" style="width:auto;">
-                                <option value="actual">Temporada Actual</option>
-                                <option value="anterior">Temporada Anterior</option>
-                                <option value="trimestre">Trimestre</option>
-                                <option value="anual">Año Actual</option>
-                            </select>
+                            <h4 class="chart-title">Análisis de Ventas</h4>
+                            <button id="btnReporteTemporada" class="btn secondary">🔄 Generar</button>
                         </div>
-                        <div id="reporteTemporada" style="padding:20px;">
-                            <div class="chart-canvas" style="height:400px;position:relative;">
-                                <canvas id="temporadaChartReportes"></canvas>
-                            </div>
+                        <div id="reporteTemporada" class="list">
+                            <div class="item">Pulsa "Generar" para ver el análisis de ventas.</div>
                         </div>
                     </div>
                 </div>
@@ -1688,9 +1673,10 @@
                     <div class="chart-container">
                         <div class="chart-header">
                             <h4 class="chart-title">Rotación de Inventario</h4>
+                            <button id="btnReporteRotacion" class="btn secondary">🔄 Generar</button>
                         </div>
                         <div id="reporteRotacion" class="list">
-                            <div class="item">Cargando rotación de inventario...</div>
+                            <div class="item">Pulsa "Generar" para ver la rotación de inventario.</div>
                         </div>
                     </div>
                 </div>
@@ -1702,6 +1688,6 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
     <script src="cliente.js"></script>
     <script src="admin-funcionalidades.js"></script>
-    <script src="reporte-ventas-simple.js"></script>
+    <script src="reporte-ventas.js"></script>
 </body>
 </html>
