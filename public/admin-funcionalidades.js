@@ -1261,47 +1261,53 @@ async function renderReporteCompras() {
             html += `<div style="margin-bottom:18px;">
                 <h4 style="margin:6px 0;">Proveedor: ${g.proveedor || 'Sin proveedor'}</h4>`;
 
-            // Agrupar las líneas por id_compra para mostrar subtotal por compra
-            const comprasById = {};
-            // En algunos entornos el servidor devuelve 'compras' o 'lines' - soportar ambos
-            const sourceLines = (g.compras && g.compras.length) ? g.compras : (g.lines && g.lines.length ? g.lines : []);
-            sourceLines.forEach(line => {
-                const id = line.id_compra || line.id || 'sin-id';
-                if (!comprasById[id]) comprasById[id] = { id_compra: id, fecha_compra: line.fecha_compra || line.fecha || '', lineas: [], subtotal: 0 };
-                comprasById[id].lineas.push(line);
-                comprasById[id].subtotal += Number(line.total_linea || (Number(line.cantidad || 0) * Number(line.costo_unitario || 0)) || 0);
-            });
-
-            // Mostrar cada compra bajo este proveedor
-            Object.values(comprasById).forEach(compra => {
-                html += `<div style="border:1px solid var(--surface-alt);padding:12px;border-radius:8px;margin:8px 0;background:#fff;">
-                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-                        <div><strong>Compra #${compra.id_compra}</strong><br><small>Fecha: ${compra.fecha_compra}</small></div>
-                        <div style="font-weight:700;">Subtotal: $${compra.subtotal.toFixed(2)}</div>
-                    </div>
-                    <div style="overflow-x:auto;">
-                        <table style="width:100%;border-collapse:collapse;">
-                            <thead>
-                                <tr style="background:var(--surface-alt);">
-                                    <th style="padding:8px;text-align:left;border:1px solid #eee;">Producto</th>
-                                    <th style="padding:8px;text-align:right;border:1px solid #eee;">Cantidad</th>
-                                    <th style="padding:8px;text-align:right;border:1px solid #eee;">Costo Unit.</th>
-                                    <th style="padding:8px;text-align:right;border:1px solid #eee;">Total Línea</th>
-                                </tr>
-                            </thead>
-                            <tbody>`;
-
-                compra.lineas.forEach(l => {
-                    html += `<tr>
-                        <td style="padding:8px;border:1px solid #f4f4f4;">${(l.marca||'') + ' ' + (l.producto||('Producto #' + (l.id_producto||'')))}</td>
-                        <td style="padding:8px;text-align:right;border:1px solid #f4f4f4;">${Number(l.cantidad||0)}</td>
-                        <td style="padding:8px;text-align:right;border:1px solid #f4f4f4;">$${Number(l.costo_unitario||0).toFixed(2)}</td>
-                        <td style="padding:8px;text-align:right;border:1px solid #f4f4f4;">$${Number(l.total_linea||0).toFixed(2)}</td>
-                    </tr>`;
+            // Iterar sobre compras bajo este proveedor
+            if (g.compras && g.compras.length > 0) {
+                g.compras.forEach(compra => {
+                    // Calcular subtotal de esta compra
+                    const subtotal = (compra.lineas && compra.lineas.length > 0)
+                        ? compra.lineas.reduce((sum, l) => sum + (Number(l.total_linea || 0)), 0)
+                        : Number(compra.total_compra || 0);
+                    
+                    html += `<div style="border:1px solid var(--surface-alt);padding:12px;border-radius:8px;margin:8px 0;background:#fff;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                            <div><strong>Compra #${compra.id_compra}</strong><br><small>Fecha: ${compra.fecha_compra}</small></div>
+                            <div style="font-weight:700;">Subtotal: $${subtotal.toFixed(2)}</div>
+                        </div>`;
+                    
+                    // Mostrar tabla de líneas si existen
+                    if (compra.lineas && compra.lineas.length > 0) {
+                        html += `<div style="overflow-x:auto;">
+                            <table style="width:100%;border-collapse:collapse;">
+                                <thead>
+                                    <tr style="background:var(--surface-alt);">
+                                        <th style="padding:8px;text-align:left;border:1px solid #eee;">Producto</th>
+                                        <th style="padding:8px;text-align:right;border:1px solid #eee;">Cantidad</th>
+                                        <th style="padding:8px;text-align:right;border:1px solid #eee;">Costo Unit.</th>
+                                        <th style="padding:8px;text-align:right;border:1px solid #eee;">Total Línea</th>
+                                    </tr>
+                                </thead>
+                                <tbody>`;
+                        
+                        compra.lineas.forEach(l => {
+                            html += `<tr>
+                                <td style="padding:8px;border:1px solid #f4f4f4;">${(l.marca||'') + (l.marca ? ' ' : '') + (l.producto||('Producto #' + (l.id_producto||'')))}</td>
+                                <td style="padding:8px;text-align:right;border:1px solid #f4f4f4;">${Number(l.cantidad||0)}</td>
+                                <td style="padding:8px;text-align:right;border:1px solid #f4f4f4;">$${Number(l.costo_unitario||0).toFixed(2)}</td>
+                                <td style="padding:8px;text-align:right;border:1px solid #f4f4f4;">$${Number(l.total_linea||0).toFixed(2)}</td>
+                            </tr>`;
+                        });
+                        
+                        html += `</tbody></table></div>`;
+                    } else {
+                        html += `<div style="padding:8px;color:#999;font-style:italic;">Sin líneas de detalle</div>`;
+                    }
+                    
+                    html += `</div>`;
                 });
-
-                html += `</tbody></table></div></div>`;
-            });
+            } else {
+                html += `<div style="padding:8px;color:#999;font-style:italic;">Sin compras</div>`;
+            }
 
             html += `</div>`;
         });

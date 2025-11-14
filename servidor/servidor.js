@@ -2368,6 +2368,7 @@ app.get('/api/reportes/compras-periodo', requiereRol('administrador'), async (re
       SELECT 
         c.id_compra,
         c.fecha_compra,
+        c.total_compra,
         pr.nombre AS proveedor,
         dc.id_producto,
         p.marca,
@@ -2392,27 +2393,52 @@ app.get('/api/reportes/compras-periodo', requiereRol('administrador'), async (re
       params.push(end + ' 23:59:59');
     }
     
-    query += ' ORDER BY c.fecha_compra DESC, c.id_compra';
+    query += ' ORDER BY c.fecha_compra DESC, c.id_compra, dc.id_producto';
     
-    const [compras] = await pool.query(query, params);
+    const [rows] = await pool.query(query, params);
 
-    // Agrupar por proveedor
+    // Agrupar por proveedor > compra > líneas
     const grupos = {};
     let totalGeneral = 0;
     
-    compras.forEach(compra => {
-      const prov = compra.proveedor || 'Sin proveedor';
+    rows.forEach(row => {
+      const prov = row.proveedor || 'Sin proveedor';
+      const compraId = row.id_compra;
+      
       if (!grupos[prov]) {
         grupos[prov] = { proveedor: prov, compras: [] };
       }
-      grupos[prov].compras.push(compra);
-      totalGeneral += Number(compra.total_linea || 0);
+      
+      // Buscar si la compra ya existe en este proveedor
+      let compra = grupos[prov].compras.find(c => c.id_compra === compraId);
+      if (!compra) {
+        compra = {
+          id_compra: compraId,
+          fecha_compra: row.fecha_compra,
+          total_compra: row.total_compra,
+          lineas: []
+        };
+        grupos[prov].compras.push(compra);
+      }
+      
+      // Agregar línea si existe
+      if (row.id_producto) {
+        compra.lineas.push({
+          id_producto: row.id_producto,
+          marca: row.marca,
+          producto: row.producto,
+          cantidad: row.cantidad,
+          costo_unitario: row.costo_unitario,
+          total_linea: row.total_linea
+        });
+        totalGeneral += Number(row.total_linea || 0);
+      }
     });
     
     res.json({ ok: true, grupos: Object.values(grupos), total_general: totalGeneral });
   } catch (e) {
     console.error('Error /api/reportes/compras-periodo:', e.message || e);
-    res.status(500).json({ ok: false, grupos: [], error: 'Error del servidor' });
+    res.status(500).json({ ok: false, grupos: [], error: 'Error del servidor: ' + e.message });
   }
 });
 
