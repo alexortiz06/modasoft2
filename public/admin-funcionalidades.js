@@ -1209,16 +1209,50 @@ async function renderReporteCompras() {
     const cont = document.getElementById('reporteCompras');
     if (!cont) return;
     cont.innerHTML = '<div class="item">Cargando compras...</div>';
+    const btn = document.getElementById('btnReporteCompras');
+    if (btn) {
+        try { btn.dataset._origText = btn.textContent; } catch(e){}
+        btn.disabled = true;
+        btn.textContent = 'Generando...';
+    }
     try {
         const fi = document.getElementById('comprasFechaInicio')?.value || '';
         const ff = document.getElementById('comprasFechaFin')?.value || '';
         const qs = new URLSearchParams();
         if (fi) qs.set('start', fi);
         if (ff) qs.set('end', ff);
-        const res = await fetch('/api/reportes/compras-periodo' + (qs.toString() ? ('?' + qs.toString()) : ''));
-        const data = await res.json();
-        if (!data.ok || !data.grupos || data.grupos.length === 0) {
-            cont.innerHTML = '<div class="item">No hay compras en el periodo seleccionado.</div>';
+        const url = '/api/reportes/compras-periodo' + (qs.toString() ? ('?' + qs.toString()) : '');
+        console.info('renderReporteCompras: requesting', url);
+        const res = await fetch(url, { credentials: 'include' });
+        if (!res.ok) {
+            // Intentar parsear JSON de error para mostrar mensaje más claro
+            let msg = `Error al solicitar datos (status ${res.status}).`;
+            try {
+                const j = await res.clone().json();
+                if (j && (j.error || j.message)) {
+                    msg += ' ' + (j.error || j.message);
+                }
+            } catch (_) {
+                try {
+                    const txt = await res.text();
+                    if (txt) msg += ' ' + txt;
+                } catch (_) {}
+            }
+            console.error('Error fetching compras-periodo:', res.status, msg);
+            cont.innerHTML = `<div class="item">${msg} Revisa la consola.</div>`;
+            return;
+        }
+        const data = await res.json().catch(err => {
+            console.error('JSON parse error for compras-periodo:', err);
+            return null;
+        });
+        if (!data || !data.ok || !data.grupos || data.grupos.length === 0) {
+            // Si el servidor devolvió ok=false mostrar mensaje de detalle
+            if (data && data.error) {
+                cont.innerHTML = `<div class="item">Error: ${data.error}</div>`;
+            } else {
+                cont.innerHTML = '<div class="item">No hay compras en el periodo seleccionado.</div>';
+            }
             return;
         }
         // Construir vista agrupada por proveedor > compra, con totales por compra y total general
@@ -1229,11 +1263,13 @@ async function renderReporteCompras() {
 
             // Agrupar las líneas por id_compra para mostrar subtotal por compra
             const comprasById = {};
-            (g.compras || []).forEach(line => {
-                const id = line.id_compra;
-                if (!comprasById[id]) comprasById[id] = { id_compra: id, fecha_compra: line.fecha_compra, lineas: [], subtotal: 0 };
+            // En algunos entornos el servidor devuelve 'compras' o 'lines' - soportar ambos
+            const sourceLines = (g.compras && g.compras.length) ? g.compras : (g.lines && g.lines.length ? g.lines : []);
+            sourceLines.forEach(line => {
+                const id = line.id_compra || line.id || 'sin-id';
+                if (!comprasById[id]) comprasById[id] = { id_compra: id, fecha_compra: line.fecha_compra || line.fecha || '', lineas: [], subtotal: 0 };
                 comprasById[id].lineas.push(line);
-                comprasById[id].subtotal += Number(line.total_linea || 0);
+                comprasById[id].subtotal += Number(line.total_linea || (Number(line.cantidad || 0) * Number(line.costo_unitario || 0)) || 0);
             });
 
             // Mostrar cada compra bajo este proveedor
@@ -1270,11 +1306,19 @@ async function renderReporteCompras() {
             html += `</div>`;
         });
 
-        // Total general
-        html += `<div style="margin-top:12px;font-weight:700;font-size:1.05em;">Total general: $${Number(data.total_general||0).toFixed(2)}</div>`;
+        // Total general (si vino desde servidor)
+        const totalGeneral = Number(data.total_general || 0);
+        html += `<div style="margin-top:12px;font-weight:700;font-size:1.05em;">Total general: $${totalGeneral.toFixed(2)}</div>`;
         cont.innerHTML = html;
     } catch (e) {
-        cont.innerHTML = '<div class="item">Error al cargar compras.</div>';
+        console.error('Error renderReporteCompras:', e);
+        cont.innerHTML = '<div class="item">Error al cargar compras. Revisa la consola para detalles.</div>';
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            try { btn.textContent = btn.dataset._origText || '🔄 Generar'; } catch(e) { btn.textContent = '🔄 Generar'; }
+            try { delete btn.dataset._origText; } catch(e){}
+        }
     }
 }
 
@@ -1552,131 +1596,128 @@ window.switchReporteTab = function(tabName) {
 };
 
 // Listeners para reportes
-if (typeof window !== 'undefined') {
-    window.addEventListener('DOMContentLoaded', function() {
-        // Listener para botón de reporte de inventario
-        const btnReporteInventario = document.getElementById('btnReporteInventario');
-        if (btnReporteInventario) {
-            btnReporteInventario.addEventListener('click', renderReporteInventario);
-        }
-        
-        // Listener para botón de reporte de compras
-        const btnReporteCompras = document.getElementById('btnReporteCompras');
-        if (btnReporteCompras) {
-            btnReporteCompras.addEventListener('click', renderReporteCompras);
-        }
-        
-        // Listener para select de temporada (en reportes)
-        const selectTemporada = document.getElementById('selectTemporada');
-        if (selectTemporada) {
-            selectTemporada.addEventListener('change', function() {
-                // Usar el canvas de reportes si estamos en la pestaña de reportes
-                fetchVentasTemporada(this.value);
-            });
-        }
-        
-        // Listener para select de temporada (en dashboard)
-        const selectTemporadaDashboard = document.getElementById('selectTemporadaDashboard');
-        if (selectTemporadaDashboard) {
-            selectTemporadaDashboard.addEventListener('change', function() {
-                fetchVentasTemporada(this.value);
-            });
-        }
-        
-        // Listener para búsqueda de ventas
-        const buscarVenta = document.getElementById('buscarVenta');
-        if (buscarVenta) {
-            buscarVenta.addEventListener('input', function() {
-                cargarVentasAdmin(this.value);
-            });
-        }
-        
-        // Listener para búsqueda de clientes
-        const buscarCliente = document.getElementById('buscarCliente');
-        if (buscarCliente) {
-            buscarCliente.addEventListener('input', function() {
-                cargarClientes(this.value);
-            });
-        }
-        
-        // Cargar datos iniciales cuando se muestran los reportes
-        setTimeout(() => {
-            // Si estamos en la pestaña de reportes, cargar datos según el tab activo
-            const reportesPanel = document.getElementById('reportesPanel');
-            if (reportesPanel && reportesPanel.style.display !== 'none') {
-                const tabUtilidad = document.getElementById('tab-utilidad');
-                if (tabUtilidad && tabUtilidad.classList.contains('active')) {
-                    cargarReporteUtilidad();
-                }
-                const tabVentas = document.getElementById('tab-ventas');
-                if (tabVentas && tabVentas.classList.contains('active')) {
-                    cargarVentasAdmin();
-                }
-                const tabClientes = document.getElementById('tab-clientes');
-                if (tabClientes && tabClientes.classList.contains('active')) {
-                    cargarClientes();
-                }
-                const tabTemporada = document.getElementById('tab-temporada');
-                if (tabTemporada && tabTemporada.classList.contains('active')) {
-                    fetchVentasTemporada('actual');
-                }
+// Adjuntar listeners y comportamientos de reportes inmediatamente (script se carga al final del body)
+(function attachReportListeners(){
+    // Listener para botón de reporte de inventario
+    const btnReporteInventario = document.getElementById('btnReporteInventario');
+    if (btnReporteInventario) {
+        btnReporteInventario.addEventListener('click', renderReporteInventario);
+    }
+
+    // Listener para botón de reporte de compras
+    const btnReporteCompras = document.getElementById('btnReporteCompras');
+    if (btnReporteCompras) {
+        btnReporteCompras.addEventListener('click', renderReporteCompras);
+    }
+
+    // Listener para select de temporada (en reportes)
+    const selectTemporada = document.getElementById('selectTemporada');
+    if (selectTemporada) {
+        selectTemporada.addEventListener('change', function() {
+            fetchVentasTemporada(this.value);
+        });
+    }
+
+    // Listener para select de temporada (en dashboard)
+    const selectTemporadaDashboard = document.getElementById('selectTemporadaDashboard');
+    if (selectTemporadaDashboard) {
+        selectTemporadaDashboard.addEventListener('change', function() {
+            fetchVentasTemporada(this.value);
+        });
+    }
+
+    // Listener para búsqueda de ventas
+    const buscarVenta = document.getElementById('buscarVenta');
+    if (buscarVenta) {
+        buscarVenta.addEventListener('input', function() {
+            cargarVentasAdmin(this.value);
+        });
+    }
+
+    // Listener para búsqueda de clientes
+    const buscarCliente = document.getElementById('buscarCliente');
+    if (buscarCliente) {
+        buscarCliente.addEventListener('input', function() {
+            cargarClientes(this.value);
+        });
+    }
+
+    // Cargar datos iniciales cuando se muestran los reportes
+    setTimeout(() => {
+        const reportesPanel = document.getElementById('reportesPanel');
+        if (reportesPanel && reportesPanel.style.display !== 'none') {
+            const tabUtilidad = document.getElementById('tab-utilidad');
+            if (tabUtilidad && tabUtilidad.classList.contains('active')) {
+                cargarReporteUtilidad();
             }
-        }, 500);
-        
-        // Listener para select de periodo de ingresos
-        const selectPeriodoIngresos = document.getElementById('selectPeriodoIngresos');
-        if (selectPeriodoIngresos) {
-            selectPeriodoIngresos.addEventListener('change', cargarIngresos);
+            const tabVentas = document.getElementById('tab-ventas');
+            if (tabVentas && tabVentas.classList.contains('active')) {
+                cargarVentasAdmin();
+            }
+            const tabClientes = document.getElementById('tab-clientes');
+            if (tabClientes && tabClientes.classList.contains('active')) {
+                cargarClientes();
+            }
+            const tabTemporada = document.getElementById('tab-temporada');
+            if (tabTemporada && tabTemporada.classList.contains('active')) {
+                fetchVentasTemporada('actual');
+            }
         }
-        
-        // Listener para formulario de registrar pago
-        const formRegistrarPago = document.getElementById('formRegistrarPago');
-        if (formRegistrarPago) {
-            formRegistrarPago.addEventListener('submit', async function(e) {
-                e.preventDefault();
-                try {
-                    const idCompra = document.getElementById('pagoIdCompra').value;
-                    const montoPagado = parseFloat(document.getElementById('pagoMonto').value || 0);
-                    const estadoPago = document.getElementById('pagoEstado').value;
-                    const metodoPago = document.getElementById('pagoMetodo').value;
-                    const referencia = document.getElementById('pagoReferencia').value;
-                    const notas = document.getElementById('pagoNotas').value;
-                    
-                    if (montoPagado <= 0) {
-                        alert('El monto a pagar debe ser mayor a 0');
-                        return;
-                    }
-                    
-                    const res = await fetch('/api/cuentas-pagar/pagar', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            id_compra: idCompra,
-                            monto_pagado: montoPagado,
-                            estado_pago: estadoPago,
-                            metodo_pago: metodoPago,
-                            referencia: referencia,
-                            notas: notas,
-                            monto_total: document.getElementById('pagoMontoPendiente').dataset.montoTotal || 0
-                        })
-                    });
-                    
-                    const data = await res.json();
-                    if (data.ok) {
-                        alert('Pago registrado correctamente');
-                        cerrarModal('modalRegistrarPago');
-                        cargarCuentasPagar();
-                    } else {
-                        alert('Error: ' + (data.error || 'No se pudo registrar el pago'));
-                    }
-                } catch (error) {
-                    console.error('Error registrando pago:', error);
-                    alert('Error de conexión');
+    }, 500);
+
+    // Listener para select de periodo de ingresos
+    const selectPeriodoIngresos = document.getElementById('selectPeriodoIngresos');
+    if (selectPeriodoIngresos) {
+        selectPeriodoIngresos.addEventListener('change', cargarIngresos);
+    }
+
+    // Listener para formulario de registrar pago
+    const formRegistrarPago = document.getElementById('formRegistrarPago');
+    if (formRegistrarPago) {
+        formRegistrarPago.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            try {
+                const idCompra = document.getElementById('pagoIdCompra').value;
+                const montoPagado = parseFloat(document.getElementById('pagoMonto').value || 0);
+                const estadoPago = document.getElementById('pagoEstado').value;
+                const metodoPago = document.getElementById('pagoMetodo').value;
+                const referencia = document.getElementById('pagoReferencia').value;
+                const notas = document.getElementById('pagoNotas').value;
+                
+                if (montoPagado <= 0) {
+                    alert('El monto a pagar debe ser mayor a 0');
+                    return;
                 }
-            });
-        }
-    });
-}
+                
+                const res = await fetch('/api/cuentas-pagar/pagar', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        id_compra: idCompra,
+                        monto_pagado: montoPagado,
+                        estado_pago: estadoPago,
+                        metodo_pago: metodoPago,
+                        referencia: referencia,
+                        notas: notas,
+                        monto_total: document.getElementById('pagoMontoPendiente').dataset.montoTotal || 0
+                    })
+                });
+                
+                const data = await res.json();
+                if (data.ok) {
+                    alert('Pago registrado correctamente');
+                    cerrarModal('modalRegistrarPago');
+                    cargarCuentasPagar();
+                } else {
+                    alert('Error: ' + (data.error || 'No se pudo registrar el pago'));
+                }
+            } catch (error) {
+                console.error('Error registrando pago:', error);
+                alert('Error de conexión');
+            }
+        });
+    }
+})();
 
 // ==================== FUNCIONES GERENCIALES ====================
 // Cargar margen de ganancia por categoría con gráfica
@@ -2043,14 +2084,6 @@ async function cargarReporteInventarioLento() {
     }
 }
 
-// Asegúrate de llamar a prepararReportes en la carga inicial si es el panel de reportes
-document.addEventListener('DOMContentLoaded', function() {
-    // ... tu código existente
-    // ...
-    // Llamada para cargar reportes
-    if (document.getElementById('reportesPanel')) {
-        prepararReportes();
-    }
-    // ...
-});
+// Nota: la inicialización de reportes se realiza en la carga DOM principal.
+// Evitar duplicar listeners 'DOMContentLoaded' al final del archivo.
 
